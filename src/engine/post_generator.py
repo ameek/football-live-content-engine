@@ -152,6 +152,8 @@ class PostGenerator:
 
         stats_section = f"\n📈 লাইভ ম্যাচ স্ট্যাটস:\n{stats_bn}\n" if stats_bn else ""
 
+        match_header = f"⚽ {h_name} বনাম {a_name} | 🏆 {tourn}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
         if event.event_type == DomainEventType.GOAL:
             headline = f"🚨 ⚽ গোওওল! {scoring_team}-এর লিড! ({min_bn}')"
             tactical_snippet = f"🎙️ খেলার বিবরণ: {tactical_bn}\n\n" if tactical_bn else ""
@@ -163,6 +165,7 @@ class PostGenerator:
                 lead_story = f"ম্যাচের {min_bn}তম মিনিটে একক নৈপুণ্যে লক্ষ্যভেদ করে {scoring_team}-এর হয়ে {momentum_bn} {player}!"
 
             content = (
+                f"{match_header}"
                 f"⚽ গোওওল! {scoring_team}-এর দুর্দান্ত মুহূর্ত!\n\n"
                 f"{lead_story}\n\n"
                 f"{tactical_snippet}"
@@ -181,6 +184,7 @@ class PostGenerator:
             headline = f"🤦 আত্মঘাতী গোল! বড় ধাক্কা খেল {scoring_team} ({min_bn}')"
             tactical_snippet = f"🎙️ খেলার বিবরণ: {tactical_bn}\n\n" if tactical_bn else ""
             content = (
+                f"{match_header}"
                 f"🤦 আত্মঘাতী গোলের বড় ধাক্কা!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে দুর্ভাগ্যের শিকার হলেন {player}। অসাবধানতাবশত নিজের জালেই বল জড়িয়ে দলকে বিপাকে ফেললেন তিনি।\n\n"
                 f"{tactical_snippet}"
@@ -197,6 +201,7 @@ class PostGenerator:
             headline = f"🟥 লাল কার্ড! ১০ জনের দলে পরিণত হলো {card_team}! ({min_bn}')"
             reason_snippet = f"🎙️ ঘটনার কারণ: {tactical_bn}\n\n" if tactical_bn else ""
             content = (
+                f"{match_header}"
                 f"🟥 লাল কার্ডের চরম নাটকীয়তা!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে রেফারি সরাসরি লাল কার্ড দেখিয়ে মাঠ থেকে বের করে দিলেন {player}-কে। বাকি ম্যাচ ১০ জনের দল নিয়ে বড় পরীক্ষার মুখে পড়তে হচ্ছে {card_team}-কে।\n\n"
                 f"{reason_snippet}"
@@ -212,6 +217,7 @@ class PostGenerator:
             headline = f"🟨 হলুদ কার্ড: সতর্ক করা হলো {player}-কে ({min_bn}')"
             reason_snippet = f"🎙️ কারণ: {tactical_bn}\n\n" if tactical_bn else ""
             content = (
+                f"{match_header}"
                 f"🟨 রেফারির কড়া সতর্কতা!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে ফাউল করে হলুদ কার্ড দেখলেন {player}।\n\n"
                 f"{reason_snippet}"
@@ -223,6 +229,7 @@ class PostGenerator:
             headline = f"🎯 পেনাল্টি থেকে গোল! এগিয়ে গেল {scoring_team} ({min_bn}')"
             tactical_snippet = f"🎙️ বিবরণ: {tactical_bn}\n\n" if tactical_bn else ""
             content = (
+                f"{match_header}"
                 f"🎯 স্পট-কিক থেকে অনবদ্য গোল!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে পাওয়া পেনাল্টি কাজে লাগিয়ে অত্যন্ত ঠান্ডা মাথায় বল জালে জড়ালেন {player}!\n\n"
                 f"{tactical_snippet}"
@@ -239,6 +246,7 @@ class PostGenerator:
             headline = f"📺 ভিএআর সিদ্ধান্তে বড় নাটকীয়তা! ({min_bn}')"
             detail = tactical_bn or event.description
             content = (
+                f"{match_header}"
                 f"📺 ভিডিও অ্যাসিস্ট্যান্ট রেফারি (VAR) হস্তক্ষেপ!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে ভিডিও পর্যালোচনার পর অন-ফিল্ড রেফারির সিদ্ধান্ত পরিবর্তন করা হয়েছে: {detail}।\n\n"
                 f"📊 স্কোর: {h_name} {score_bn} {a_name}\n"
@@ -249,14 +257,17 @@ class PostGenerator:
         elif event.event_type == DomainEventType.SUBSTITUTION:
             headline = f"🔄 ট্যাকটিকাল পরিবর্তন: {scoring_team} ({min_bn}')"
             content = (
+                f"{match_header}"
                 f"🔄 গুরুত্বপূর্ণ খেলোয়াড় বদল!\n\n"
                 f"ম্যাচের {min_bn}তম মিনিটে {event.secondary_player_name}-এর জায়গায় মাঠে নামলেন {event.player_name}।\n\n"
-                f"📊 চলতি স্কোর: {h_name} {score_bn} {a_name}"
+                f"📊 চলতি স্কোর: {h_name} {score_bn} {a_name}\n"
+                f"🏆 টুর্নামেন্ট: {tourn}"
             )
 
         elif event.event_type == DomainEventType.PERIOD_HALF_TIME:
             headline = f"⏸️ প্রথমার্ধের সমাপ্তি: {h_name} {score_bn} {a_name}"
             content = (
+                f"{match_header}"
                 f"⏸️ বিরতির বাঁশি বাজালেন রেফারি!\n\n"
                 f"প্রথমার্ধের টানটান লড়াই শেষে স্কোরলাইন দাঁড়িয়েছে {h_name} {score_bn} {a_name}।\n\n"
                 f"📊 বিরতির স্কোর: {h_name} {score_bn} {a_name}\n"
@@ -317,6 +328,7 @@ class PostGenerator:
             red_section = f"🟥 লাল কার্ড: {', '.join(red_cards)}\n\n" if red_cards else ""
 
             content = (
+                f"{match_header}"
                 f"🏁 পূর্ণ ৯০ মিনিটের লড়াই শেষ!\n\n"
                 f"{winner_text}\n\n"
                 f"{scorers_section}"
@@ -330,6 +342,7 @@ class PostGenerator:
         else:
             headline = f"📢 ম্যাচের আপডেট ({min_bn}')"
             content = (
+                f"{match_header}"
                 f"📢 আপডেট: {event.description} ({min_bn}')\n\n"
                 f"📊 স্কোর: {h_name} {score_bn} {a_name}\n"
                 f"🏆 টুর্নামেন্ট: {tourn}"
@@ -362,6 +375,7 @@ class PostGenerator:
         stats_en = tactical_info.get("stats_en_block") if tactical_info else ""
 
         stats_section = f"\n📈 Live Match Stats:\n{stats_en}\n" if stats_en else ""
+        match_header = f"⚽ {h_team} vs {a_team} | 🏆 {tourn}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
         if event.event_type == DomainEventType.GOAL:
             headline = f"🚨 ⚽ GOAL! {scoring_team} Take the Lead! ({min_str})"
@@ -374,6 +388,7 @@ class PostGenerator:
                 lead_story = f"In the {min_str} minute, {player} {momentum_en} for {scoring_team} with a clinical strike!"
 
             content = (
+                f"{match_header}"
                 f"⚽ GOAL! A decisive breakthrough for {scoring_team}!\n\n"
                 f"{lead_story}\n\n"
                 f"{tactical_snippet}"
@@ -392,6 +407,7 @@ class PostGenerator:
             headline = f"🤦 OWN GOAL! Disaster for {scoring_team} ({min_str})"
             tactical_snippet = f"🎙️ Incident: {tactical_en}\n\n" if tactical_en else ""
             content = (
+                f"{match_header}"
                 f"🤦 OWN GOAL DRAMA!\n\n"
                 f"A devastating moment in the {min_str} minute as {player} unfortunately turns the ball into their own net.\n\n"
                 f"{tactical_snippet}"
@@ -408,6 +424,7 @@ class PostGenerator:
             headline = f"🟥 RED CARD! {card_team} Down to 10 Men! ({min_str})"
             reason_snippet = f"🎙️ Reason: {tactical_en}\n\n" if tactical_en else ""
             content = (
+                f"{match_header}"
                 f"🟥 MAJOR MATCH DRAMA!\n\n"
                 f"The referee shows a straight red card to {player} in the {min_str} minute! {card_team} must battle the rest of the game with 10 players.\n\n"
                 f"{reason_snippet}"
@@ -422,6 +439,7 @@ class PostGenerator:
         elif event.event_type == DomainEventType.PERIOD_HALF_TIME:
             headline = f"⏸️ HALF-TIME: {h_team} {score_str} {a_team}"
             content = (
+                f"{match_header}"
                 f"⏸️ HALF-TIME whistle blows!\n\n"
                 f"A competitive 45 minutes of football comes to an end with the scoreline standing at {h_team} {score_str} {a_team}.\n\n"
                 f"📊 Score at the break: {h_team} {score_str} {a_team}\n"
@@ -481,6 +499,7 @@ class PostGenerator:
             red_section = f"🟥 Red Cards: {', '.join(red_cards)}\n\n" if red_cards else ""
 
             content = (
+                f"{match_header}"
                 f"🏁 FULL-TIME! The referee blows the final whistle.\n\n"
                 f"{winner_text}\n\n"
                 f"{scorers_section}"
@@ -494,6 +513,7 @@ class PostGenerator:
         else:
             headline = f"📢 Match Update ({min_str})"
             content = (
+                f"{match_header}"
                 f"📢 Update: {event.description} ({min_str})\n\n"
                 f"📊 Score: {h_team} {score_str} {a_team}\n"
                 f"🏆 Competition: {tourn}"

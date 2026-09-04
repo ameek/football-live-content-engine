@@ -13,6 +13,8 @@ from src.engine.websocket_manager import WebSocketNotificationManager
 from src.engine.monitor import MatchMonitor
 from src.api.routes import router
 
+from src.publishers.telegram_bot_listener import TelegramBotListener
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("football_api")
 
@@ -35,6 +37,7 @@ class AppState:
             ws_manager=self.ws_manager,
             poll_interval_seconds=settings.poll_interval_seconds
         )
+        self.bot_listener = TelegramBotListener(monitor=self.monitor)
 
 
 app_state = AppState()
@@ -42,10 +45,12 @@ app_state = AppState()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing Night-Shift Content Engine...")
+    logger.info("Initializing Night-Shift Content Engine & Interactive Telegram Bot Listener...")
     await app_state.monitor.start()
+    await app_state.bot_listener.start()
     yield
-    logger.info("Shutting down monitor loop...")
+    logger.info("Shutting down monitor loop and bot listener...")
+    await app_state.bot_listener.stop()
     await app_state.monitor.stop()
 
 
@@ -450,6 +455,56 @@ DASHBOARD_HTML = """
         </div>
     </div>
 
+    <!-- ================= Social Graphics Preview Modal ================= -->
+    <div id="graphics-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0b1322] border border-slate-700/80 w-full max-w-3xl rounded-2xl p-6 shadow-2xl flex flex-col max-h-[92vh]">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center pb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🖼️</span>
+                    <div>
+                        <h3 id="graphics-modal-title" class="text-base font-bold text-white">Social Media Match Graphic</h3>
+                        <p id="graphics-modal-subtitle" class="text-xs text-slate-400">High-resolution match visual for Facebook & Social Desk</p>
+                    </div>
+                </div>
+                <button onclick="closeGraphicsModal()" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+            </div>
+
+            <!-- Visual Style / Type Tabs -->
+            <div class="flex items-center gap-2 pt-3 pb-1" id="graphics-tab-bar">
+                <button onclick="switchGraphicsTab('goal')" id="tab-btn-goal" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white transition flex items-center gap-1.5 shadow-sm">
+                    <span>⚽</span> <span>Goal Card (1:1)</span>
+                </button>
+                <button onclick="switchGraphicsTab('lineup')" id="tab-btn-lineup" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5">
+                    <span>📋</span> <span>Starting XI Pitch (4:5)</span>
+                </button>
+                <button onclick="switchGraphicsTab('fulltime')" id="tab-btn-fulltime" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5">
+                    <span>🏁</span> <span>Full-Time Scorecard (1:1)</span>
+                </button>
+            </div>
+
+            <!-- Graphic Image Preview Container -->
+            <div class="flex-1 overflow-y-auto py-4 flex flex-col items-center justify-center min-h-[380px] relative bg-[#070c16]/90 rounded-xl border border-slate-800 my-2 shadow-inner">
+                <div id="graphics-loading" class="flex flex-col items-center gap-2 text-slate-400 text-xs">
+                    <span class="text-3xl animate-spin">⏳</span>
+                    <span class="font-medium">Rendering HD Match Graphic...</span>
+                </div>
+                <img id="graphics-preview-img" src="" alt="Match Graphic" class="max-h-[500px] w-auto object-contain rounded-lg shadow-2xl hidden" onload="onGraphicLoaded()" onerror="onGraphicError()">
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="pt-3 border-t border-slate-800 flex justify-between items-center gap-3">
+                <span class="text-[11px] text-slate-500">Auto-formatted with crests & verified typography</span>
+                <div class="flex items-center gap-3">
+                    <button onclick="closeGraphicsModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Close</button>
+                    <a id="graphics-download-btn" href="#" download="match-card.png" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition flex items-center gap-1.5">
+                        <span>⬇️</span> <span>Download PNG</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Floating Copy Toast -->
     <div id="copy-toast" class="fixed bottom-6 right-6 bg-emerald-600 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl shadow-emerald-950/80 border border-emerald-400/40 hidden transition duration-300 flex items-center gap-2 z-50">
         <span>✓</span> <span id="toast-text">Copied to clipboard!</span>
@@ -829,6 +884,10 @@ DASHBOARD_HTML = """
                                     <option value="bn" ${lang === 'bn' ? 'selected' : ''}>🇧🇩 বাংলা</option>
                                     <option value="en" ${lang === 'en' ? 'selected' : ''}>🇬🇧 EN</option>
                                 </select>
+
+                                <button onclick="openGraphicsModal('goal', '${m.id}', '${m.home_team.name} vs ${m.away_team.name}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700 transition" title="Preview HD Social Media Graphics">
+                                    <span>🖼️</span> <span>Card</span>
+                                </button>
                             </div>
 
                             <!-- Right: Telegram Live Indicator & Track Button -->
@@ -952,6 +1011,9 @@ DASHBOARD_HTML = """
                                 ${(p.team_logo_url || p.image_url) ? `<img src="${p.team_logo_url || p.image_url}" class="w-5 h-5 object-contain rounded-full bg-slate-800/80 p-0.5 border border-slate-700/50" onerror="this.style.display='none'">` : ''}
                             </div>
                             <div class="flex items-center gap-2">
+                                <button onclick="openGraphicsModalForPost('${p.post_id}', '${p.match_id}', '${p.event_id}', '${(p.headline || '').replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 flex items-center gap-1 transition" title="Preview HD Social Graphic">
+                                    <span>🖼️</span> <span>Card</span>
+                                </button>
                                 <button onclick="copyPostToClipboard('${p.post_id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition" title="Copy text to clipboard">
                                     <span>📋</span> <span>Copy</span>
                                 </button>
@@ -1303,6 +1365,9 @@ DASHBOARD_HTML = """
                                     <option value="STANDARD" ${coverage === 'STANDARD' ? 'selected' : ''}>🟡 Standard</option>
                                     <option value="RESULT_ONLY" ${coverage === 'RESULT_ONLY' ? 'selected' : ''}>🟢 Result Only</option>
                                 </select>
+                                <button onclick="openGraphicsModal('lineup', '${m.id}', '${m.home_team.name} vs ${m.away_team.name}')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700 transition" title="Preview Starting XI Pitch Board">
+                                    <span>📋</span> <span>XI</span>
+                                </button>
                             </div>
 
                             <button onclick="preScheduleMatch('${m.id}', ${!isTracked})" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-150 ${isTracked ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'}">
@@ -1338,6 +1403,80 @@ DASHBOARD_HTML = """
             showToast(shouldTrack ? "✓ Fixture pre-scheduled for Remote Desk!" : "✕ Fixture removed from Remote Desk");
             await fetchMatches();
             await fetchCalendarMatches();
+        }
+
+        // ================= Social Graphics Modal Logic =================
+        let activeModalMatchId = null;
+        let activeModalTab = "goal";
+
+        function openGraphicsModal(type, matchId, title) {
+            activeModalMatchId = matchId;
+            activeModalTab = type || 'goal';
+            
+            const modal = document.getElementById('graphics-modal');
+            const titleEl = document.getElementById('graphics-modal-title');
+            const subEl = document.getElementById('graphics-modal-subtitle');
+            
+            if (title) titleEl.innerText = title;
+            if (subEl) subEl.innerText = `High-resolution social visual for ${title || 'match'}`;
+            
+            modal.classList.remove('hidden');
+            switchGraphicsTab(activeModalTab);
+        }
+
+        function openGraphicsModalForPost(postId, matchId, eventId, headline) {
+            let initialType = 'goal';
+            if (headline && (headline.includes('একাদশ') || headline.includes('Lineup') || headline.includes('Starting XI'))) {
+                initialType = 'lineup';
+            } else if (headline && (headline.includes('পূর্ণ সময়') || headline.includes('Full-Time') || headline.includes('ম্যাচ শেষ'))) {
+                initialType = 'fulltime';
+            }
+            openGraphicsModal(initialType, matchId, headline);
+        }
+
+        function closeGraphicsModal() {
+            const modal = document.getElementById('graphics-modal');
+            modal.classList.add('hidden');
+        }
+
+        function switchGraphicsTab(tab) {
+            activeModalTab = tab;
+            
+            // Highlight active tab
+            ['goal', 'lineup', 'fulltime'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (btn) {
+                    if (t === tab) {
+                        btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white transition flex items-center gap-1.5 shadow-sm";
+                    } else {
+                        btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5";
+                    }
+                }
+            });
+
+            // Show loading spinner
+            const loading = document.getElementById('graphics-loading');
+            const img = document.getElementById('graphics-preview-img');
+            const dlBtn = document.getElementById('graphics-download-btn');
+            
+            loading.classList.remove('hidden');
+            loading.innerHTML = '<span class="text-3xl animate-spin">⏳</span><span class="font-medium">Rendering HD Match Graphic...</span>';
+            img.classList.add('hidden');
+
+            const url = `/api/graphics/${tab}/${activeModalMatchId}?t=${Date.now()}`;
+            img.src = url;
+            dlBtn.href = url;
+            dlBtn.download = `${activeModalMatchId}-${tab}-card.png`;
+        }
+
+        function onGraphicLoaded() {
+            document.getElementById('graphics-loading').classList.add('hidden');
+            document.getElementById('graphics-preview-img').classList.remove('hidden');
+        }
+
+        function onGraphicError() {
+            const loading = document.getElementById('graphics-loading');
+            loading.innerHTML = '<span class="text-rose-400 font-semibold">⚠️ Failed to generate image preview. Check match ID or logs.</span>';
         }
 
         function setupWebSocket() {

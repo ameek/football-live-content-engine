@@ -37,8 +37,8 @@ class TelegramPublisher:
     def is_configured(self) -> bool:
         return bool(self.bot_token and self.chat_id)
 
-    async def send_post(self, post: GeneratedPost) -> bool:
-        """Send formatted post with team/league logo to Telegram Channel or Chat."""
+    async def send_post(self, post: GeneratedPost, custom_card_bytes: Optional[bytes] = None) -> bool:
+        """Send formatted post with HD graphic card or logo and interactive action buttons to Telegram."""
         if not self.is_configured:
             logger.warning("Telegram publisher skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured.")
             return False
@@ -46,61 +46,70 @@ class TelegramPublisher:
         # Format message with headline and body
         message_text = f"🚨 <b>{post.headline}</b>\n\n{post.content}\n\n#FootballNews #RemoteDesk"
 
-        # Try sending as photo with caption if logo/image URL is available
+        # Interactive Inline Keyboard
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "🔁 বাংলা / English", "callback_data": f"toggle_lang:{post.post_id}"},
+                    {"text": "📊 লাইভ স্ট্যাটস", "callback_data": f"stats:{post.match_id}"}
+                ],
+                [
+                    {"text": "🖼️ ম্যাচ কার্ড", "callback_data": f"card:{post.match_id}"},
+                    {"text": "❌ ডিলিট", "callback_data": "delete_post"}
+                ]
+            ]
+        }
+
+        # Try sending as photo with caption if custom graphic or logo is available
+        img_bytes = custom_card_bytes
         img_url = post.image_url or post.team_logo_url or post.tournament_logo_url
-        if img_url:
-            photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+
+        if not img_bytes and img_url:
             try:
                 from src.storage.image_cache import ImageCacheService
-                img_bytes = None
-                
-                # Check if it's a local proxy endpoint or team ID
                 if "/api/logos/team/" in img_url:
                     t_id = img_url.split("/api/logos/team/")[-1].split("?")[0]
                     img_bytes = await ImageCacheService.get_or_download_team_logo(t_id)
                 elif "/api/logos/tournament/" in img_url:
                     tourn_id = img_url.split("/api/logos/tournament/")[-1].split("?")[0]
                     img_bytes = await ImageCacheService.get_or_download_tournament_logo(tourn_id)
+            except Exception as e:
+                logger.debug(f"Image resolution error: {e}")
 
+        photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+        if img_bytes:
+            try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    if img_bytes:
-                        files = {"photo": ("crest.png", img_bytes, "image/png")}
-                        data = {"chat_id": self.chat_id, "caption": message_text, "parse_mode": "HTML"}
-                        response = await client.post(photo_url, data=data, files=files)
-                    else:
-                        photo_payload = {
-                            "chat_id": self.chat_id,
-                            "photo": img_url,
-                            "caption": message_text,
-                            "parse_mode": "HTML"
-                        }
-                        response = await client.post(photo_url, json=photo_payload)
-
+                    files = {"photo": ("graphic.png", img_bytes, "image/png")}
+                    data = {
+                        "chat_id": self.chat_id,
+                        "caption": message_text,
+                        "parse_mode": "HTML",
+                        "reply_markup": json.dumps(reply_markup)
+                    }
+                    response = await client.post(photo_url, data=data, files=files)
                     if response.status_code == 200:
-                        logger.info(f"✅ [Telegram Photo Published] Post {post.post_id} with logo dispatched to chat {self.chat_id}")
+                        logger.info(f"✅ [Telegram Photo Published] Post {post.post_id} dispatched to chat {self.chat_id}")
                         return True
                     elif response.status_code == 429:
                         retry_after = float(response.json().get("parameters", {}).get("retry_after", 2))
-                        logger.warning(f"Telegram rate limited (429), waiting {retry_after}s...")
                         import asyncio
                         await asyncio.sleep(retry_after)
-                        if img_bytes:
-                            retry_resp = await client.post(photo_url, data=data, files=files)
-                        else:
-                            retry_resp = await client.post(photo_url, json=photo_payload)
+                        retry_resp = await client.post(photo_url, data=data, files=files)
                         if retry_resp.status_code == 200:
                             logger.info(f"✅ [Telegram Photo Published (Retried)] Post {post.post_id}")
                             return True
             except Exception as e:
                 logger.warning(f"Telegram photo dispatch error ({e}), falling back to text message")
 
-        # Fallback to standard text message
+        # Fallback to standard text message with inline keyboard
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         payload = {
             "chat_id": self.chat_id,
             "text": message_text,
             "parse_mode": "HTML",
-            "disable_web_page_preview": False
+            "disable_web_page_preview": False,
+            "reply_markup": reply_markup
         }
 
         try:

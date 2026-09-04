@@ -283,6 +283,75 @@ async def get_tournament_logo(tournament_id: str):
     return Response(content=img_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
+@router.get("/graphics/goal/{match_id}")
+async def get_goal_card(match_id: str, minute: int = 34, player: str = "Goalscorer", assist: Optional[str] = None, monitor: MatchMonitor = Depends(get_monitor)):
+    """Render and serve 1080x1080 Goal Graphic Card."""
+    from fastapi.responses import Response
+    from src.engine.graphics_generator import GraphicsEngine
+    match = await monitor.provider.get_match_by_id(match_id)
+    if not match:
+        scheduled = await monitor.provider.get_scheduled_matches()
+        for s in scheduled:
+            if s.id == match_id:
+                match = s
+                break
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    evt = DomainEvent(
+        event_id=f"evt_{match_id}_card",
+        match_id=match_id,
+        event_type=DomainEventType.GOAL,
+        minute=minute,
+        player_name=player,
+        secondary_player_name=assist,
+        home_score=match.score.home or 1,
+        away_score=match.score.away,
+        is_home_team=True,
+        description="Goal"
+    )
+    img_bytes = await GraphicsEngine.render_goal_card(match, evt, lang=match.language)
+    return Response(content=img_bytes, media_type="image/png")
+
+
+@router.get("/graphics/fulltime/{match_id}")
+async def get_fulltime_card(match_id: str, monitor: MatchMonitor = Depends(get_monitor)):
+    """Render and serve 1080x1080 Full-Time Scorecard."""
+    from fastapi.responses import Response
+    from src.engine.graphics_generator import GraphicsEngine
+    match = await monitor.provider.get_match_by_id(match_id)
+    if not match:
+        scheduled = await monitor.provider.get_scheduled_matches()
+        for s in scheduled:
+            if s.id == match_id:
+                match = s
+                break
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    events = await monitor.provider.get_match_events(match_id)
+    stats = await monitor.provider.get_match_statistics(match_id)
+    img_bytes = await GraphicsEngine.render_fulltime_card(match, events, stats, lang=match.language)
+    return Response(content=img_bytes, media_type="image/png")
+
+
+@router.get("/graphics/lineup/{match_id}")
+async def get_lineup_card(match_id: str, monitor: MatchMonitor = Depends(get_monitor)):
+    """Render and serve 1080x1350 Starting XI Tactical Pitch Board."""
+    from fastapi.responses import Response
+    from src.engine.graphics_generator import GraphicsEngine
+    match = await monitor.provider.get_match_by_id(match_id)
+    if not match:
+        scheduled = await monitor.provider.get_scheduled_matches()
+        for s in scheduled:
+            if s.id == match_id:
+                match = s
+                break
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    img_bytes = await GraphicsEngine.render_lineup_card(match, {}, lang=match.language)
+    return Response(content=img_bytes, media_type="image/png")
+
+
 @router.websocket("/ws/live-events")
 async def websocket_endpoint(websocket: WebSocket, monitor: MatchMonitor = Depends(get_monitor)):
     """Real-time WebSocket event and post notification stream."""
