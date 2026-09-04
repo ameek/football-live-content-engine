@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: football-live-content-engine
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PROVIDER_TYPE
+        value: LIVE
+      - key: POLL_INTERVAL_SECONDS
+        value: 15
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false

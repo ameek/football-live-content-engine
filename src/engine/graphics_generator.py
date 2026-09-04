@@ -19,20 +19,35 @@ FONT_BN = "/usr/share/fonts/google-noto-vf/NotoSansBengali[wght].ttf"
 
 
 def get_font(size: int, bold: bool = False, bengali: bool = False) -> ImageFont.ImageFont:
-    """Load appropriate font with graceful fallbacks."""
+    """Load appropriate font with graceful fallbacks across standard Linux / Docker distros."""
     candidates = []
-    if bengali and os.path.exists(FONT_BN):
-        candidates.append(FONT_BN)
-    if bold and os.path.exists(FONT_BOLD):
-        candidates.append(FONT_BOLD)
-    if os.path.exists(FONT_SANS):
-        candidates.append(FONT_SANS)
+    if bengali:
+        candidates.extend([
+            FONT_BN,
+            "/usr/share/fonts/truetype/noto/NotoSansBengali-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansBengali-Bold.otf",
+            "/usr/share/fonts/noto/NotoSansBengali-Bold.ttf",
+        ])
+    if bold:
+        candidates.extend([
+            FONT_BOLD,
+            "/usr/share/fonts/truetype/carlito/Carlito-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        ])
+    candidates.extend([
+        FONT_SANS,
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    ])
 
     for path in candidates:
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:
-            continue
+        if path and os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
     return ImageFont.load_default()
 
 
