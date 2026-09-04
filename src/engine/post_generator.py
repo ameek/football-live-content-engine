@@ -155,14 +155,15 @@ class PostGenerator:
         match_header = f"⚽ {h_name} বনাম {a_name} | 🏆 {tourn}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
         if event.event_type == DomainEventType.GOAL:
-            headline = f"🚨 ⚽ গোওওল! {scoring_team}-এর লিড! ({min_bn}')"
+            headline_action = tactical_info.get("headline_action_bn", "এগিয়ে গেল") if tactical_info else "এগিয়ে গেল"
+            headline = f"🚨 ⚽️ গোল! {headline_action} {scoring_team} ({min_bn}')"
             tactical_snippet = f"🎙️ খেলার বিবরণ: {tactical_bn}\n\n" if tactical_bn else ""
             assist_line = f"👟 অ্যাসিস্ট: {assist}\n" if assist else ""
 
             if assist:
-                lead_story = f"ম্যাচের {min_bn}তম মিনিটে {assist}-এর দুর্দান্ত পাস থেকে চমৎকার ফিনিশিংয়ে {scoring_team}-এর হয়ে {momentum_bn} {player}!"
+                lead_story = f"ম্যাচের {min_bn}তম মিনিটে {assist}-এর দুর্দান্ত পাস থেকে চমৎকার ফিনিশিংয়ে {scoring_team}-কে {momentum_bn} {player}!"
             else:
-                lead_story = f"ম্যাচের {min_bn}তম মিনিটে একক নৈপুণ্যে লক্ষ্যভেদ করে {scoring_team}-এর হয়ে {momentum_bn} {player}!"
+                lead_story = f"ম্যাচের {min_bn}তম মিনিটে একক নৈপুণ্যে লক্ষ্যভেদ করে {scoring_team}-কে {momentum_bn} {player}!"
 
             content = (
                 f"{match_header}"
@@ -378,7 +379,8 @@ class PostGenerator:
         match_header = f"⚽ {h_team} vs {a_team} | 🏆 {tourn}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
         if event.event_type == DomainEventType.GOAL:
-            headline = f"🚨 ⚽ GOAL! {scoring_team} Take the Lead! ({min_str})"
+            headline_action = tactical_info.get("headline_action_en", "Takes the Lead") if tactical_info else "Takes the Lead"
+            headline = f"🚨 ⚽ GOAL! {scoring_team} {headline_action}! ({min_str})"
             tactical_snippet = f"🎙️ Play Breakdown: {tactical_en}\n\n" if tactical_en else ""
             assist_line = f"👟 Assist: {assist}\n" if assist else ""
 

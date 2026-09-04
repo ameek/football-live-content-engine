@@ -185,26 +185,85 @@ class CommentaryEnricher:
         return t.strip()
 
     @classmethod
-    def calculate_momentum(cls, home_score: int, away_score: int, is_home: bool) -> Tuple[str, str]:
-        """Calculate dynamic game situation / lead momentum phrasing."""
-        scoring_score = home_score if is_home else away_score
-        opponent_score = away_score if is_home else home_score
-        diff = scoring_score - opponent_score
+    def calculate_momentum(cls, home_score: int, away_score: int, is_home: bool) -> Dict[str, str]:
+        """
+        Calculate dynamic scoreline state transition momentum phrasing:
+        - 0–0 -> 1–0 : এগিয়ে গেল
+        - 1–0 -> 2–0 : ব্যবধান দ্বিগুণ করল
+        - 2–0 -> 3–0 : ব্যবধান আরও বাড়াল
+        - 2–0 -> 2–1 : ব্যবধান কমাল
+        - 1–0 -> 1–1 : সমতায় ফিরল
+        - 1–1 -> 2–1 : আবার এগিয়ে গেল
+        - 2–2 -> 3–2 : আবারও এগিয়ে গেল
+        """
+        s_new = home_score if is_home else away_score
+        o_new = away_score if is_home else home_score
+        s_prev = max(0, s_new - 1)
+        o_prev = o_new
 
-        if diff == 1 and opponent_score == 0:
-            return "ডেডলক ভেঙে দলকে গুরুত্বপূর্ণ লিড এনে দিলেন", "broke the deadlock to give their team the lead"
-        elif diff == 0:
-            return "ম্যাচে নাটকীয় সমতা ফেরালেন", "struck a dramatic equalizer to level the score"
-        elif diff == 1 and opponent_score > 0:
-            return "পুনরায় দলকে এগিয়ে নিলেন", "restored their team's advantage"
-        elif diff == 2:
-            return "দলের লিড দ্বিগুণ করে সুবিধাজনক অবস্থানে নিয়ে গেলেন", "doubled the lead in commanding fashion"
-        elif diff >= 3:
-            return "ব্যবধান আরও বাড়িয়ে দলের বড় জয় সুসংহত করলেন", "further extended the commanding lead"
-        elif diff < 0:
-            return "ব্যবধান কমিয়ে ম্যাচে ফেরার জোর লড়াই শুরু করলেন", "pulled one back to ignite the comeback"
+        # 1. 0–0 -> 1–0 (First lead of the match)
+        if s_prev == 0 and o_prev == 0:
+            return {
+                "headline_bn": "এগিয়ে গেল",
+                "headline_en": "Takes the Lead",
+                "verb_bn": "এগিয়ে নিলেন",
+                "verb_en": "broke the deadlock to give their team the lead"
+            }
 
-        return "দলের হয়ে লক্ষ্যভেদ করলেন", "found the back of the net"
+        # 2. 1–0 -> 1–1, 2–1 -> 2–2 (Equalizer from behind)
+        elif s_new == o_new:
+            return {
+                "headline_bn": "সমতায় ফিরল",
+                "headline_en": "Equalizes",
+                "verb_bn": "সমতায় ফেরালেন",
+                "verb_en": "struck a dramatic equalizer to level the score"
+            }
+
+        # 3. 1–1 -> 2–1, 2–2 -> 3–2 (Retaking the lead after parity)
+        elif s_prev == o_prev and o_prev > 0:
+            headline_bn = "আবারও এগিয়ে গেল" if o_prev >= 2 else "আবার এগিয়ে গেল"
+            verb_bn = "আবারও এগিয়ে নিলেন" if o_prev >= 2 else "আবার এগিয়ে নিলেন"
+            return {
+                "headline_bn": headline_bn,
+                "headline_en": "Retakes the Lead",
+                "verb_bn": verb_bn,
+                "verb_en": "restored their team's advantage"
+            }
+
+        # 4. 1–0 -> 2–0 (Doubling lead against 0)
+        elif s_prev == 1 and o_prev == 0:
+            return {
+                "headline_bn": "ব্যবধান দ্বিগুণ করল",
+                "headline_en": "Doubles the Lead",
+                "verb_bn": "ব্যবধান দ্বিগুণ করলেন",
+                "verb_en": "doubled the lead in commanding fashion"
+            }
+
+        # 5. 2–0 -> 3–0, 3–1 -> 4–1 (Further extending lead)
+        elif s_prev > o_prev and s_prev >= 2:
+            return {
+                "headline_bn": "ব্যবধান আরও বাড়াল",
+                "headline_en": "Extends the Lead",
+                "verb_bn": "ব্যবধান আরও বাড়ালেন",
+                "verb_en": "further extended the commanding lead"
+            }
+
+        # 6. 2–0 -> 2–1, 3–1 -> 3–2 (Trailing team reduces the deficit)
+        elif s_new < o_new:
+            return {
+                "headline_bn": "ব্যবধান কমাল",
+                "headline_en": "Pulls One Back",
+                "verb_bn": "ব্যবধান কমালেন",
+                "verb_en": "pulled one back to reduce the deficit"
+            }
+
+        # Fallback
+        return {
+            "headline_bn": "এগিয়ে গেল" if s_new > o_new else "গোল করল",
+            "headline_en": "Scores",
+            "verb_bn": "লক্ষ্যভেদ করলেন",
+            "verb_en": "found the back of the net"
+        }
 
     @classmethod
     async def enrich_incident_details(cls, event: DomainEvent, match: Match) -> Dict[str, Any]:
@@ -244,7 +303,11 @@ class CommentaryEnricher:
                         break
 
         # 3. Calculate game momentum
-        lead_momentum_bn, lead_momentum_en = cls.calculate_momentum(event.home_score, event.away_score, is_home)
+        momentum_dict = cls.calculate_momentum(event.home_score, event.away_score, is_home)
+        lead_momentum_bn = momentum_dict.get("verb_bn", "লক্ষ্যভেদ করলেন")
+        lead_momentum_en = momentum_dict.get("verb_en", "found the back of the net")
+        headline_action_bn = momentum_dict.get("headline_bn", "এগিয়ে গেল")
+        headline_action_en = momentum_dict.get("headline_en", "Takes the Lead")
 
         bangla_tactical = None
         english_tactical = None
@@ -342,6 +405,8 @@ class CommentaryEnricher:
             "english_tactical": english_tactical,
             "lead_momentum_bn": lead_momentum_bn,
             "lead_momentum_en": lead_momentum_en,
+            "headline_action_bn": headline_action_bn,
+            "headline_action_en": headline_action_en,
             "stats_bn_block": stats_bn_block,
             "stats_en_block": stats_en_block,
             "raw_stats": stats
