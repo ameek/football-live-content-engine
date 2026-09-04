@@ -1,6 +1,29 @@
-# 📋 Implementation Roadmap: Social Graphics Engine & Interactive Telegram Bot
+# 📋 Implementation Roadmap: Social Graphics Engine, Interactive Bot & Post Formatting
 
-This document outlines the architecture, data flows, and technical implementation plan for **Automated Social Match Graphics** and **Full Telegram Bot Interactive Control**.
+This document outlines the architecture, data flows, and technical implementation plan for **Automated Social Match Graphics**, **Full Telegram Bot Interactive Control**, and **Post Formatting Standards**.
+
+---
+
+## 📰 Post Formatting Standard: Match Header & Fixture Identity (NEW)
+
+### Requirement:
+Every post (Goals, Cards, Substitutions, VAR, Halftime, Fulltime) must prominently display the **fixture identity at the very top** so readers instantly know which match is being reported without reading down to the scoreline.
+
+### Template Standard:
+```text
+⚽ {Home Team} vs {Away Team} | 🏆 {Tournament Name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 🔄 ট্যাকটিকাল পরিবর্তন: {Team Name} ({Minute}')
+
+🔄 গুরুত্বপূর্ণ খেলোয়াড় বদল!
+
+ম্যাচের {Minute}তম মিনিটে {Player Out}-এর জায়গায় মাঠে নামলেন {Player In}।
+
+📊 চলতি স্কোর: {Home Team} {Score} {Away Team}
+🏆 টুর্নামেন্ট: {Tournament Name}
+
+প্যাভিলিয়ন স্পোর্টস ডেস্ক 🇧🇩
+```
 
 ---
 
@@ -74,7 +97,8 @@ Desk editors can control the remote monitoring directly from Telegram chat:
 
 | Phase | Milestone | Deliverables |
 | :--- | :--- | :--- |
-| **Phase 1** | **Graphics Template Engine** | Build `Pillow` visual renderer for Goal Cards, Lineup Pitch Boards, and FT Result Cards. |
-| **Phase 2** | **Lineups Ingestion Pipeline** | Add `/event/{id}/lineups` polling with 60-min pre-match alert triggers. |
-| **Phase 3** | **Interactive Telegram Bot Listener** | Implement `TelegramBotListener` long-polling `getUpdates` for button callbacks & commands. |
-| **Phase 4** | **Desk UI Image Previews** | Display rendered social cards in the Web UI dashboard with one-click download & copy. |
+| **Phase 1** | **Post Header Formatting** | Add prominent `{Home} vs {Away} \| 🏆 {Tournament}` header to all event templates. |
+| **Phase 2** | **Graphics Template Engine** | Build `Pillow` visual renderer for Goal Cards, Lineup Pitch Boards, and FT Result Cards. |
+| **Phase 3** | **Lineups Ingestion Pipeline** | Add `/event/{id}/lineups` polling with 60-min pre-match alert triggers. |
+| **Phase 4** | **Interactive Telegram Bot Listener** | Implement `TelegramBotListener` long-polling `getUpdates` for button callbacks & commands. |
+| **Phase 5** | **Desk UI Image Previews** | Display rendered social cards in the Web UI dashboard with one-click download & copy. |
