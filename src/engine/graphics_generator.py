@@ -1,6 +1,8 @@
 import io
 import os
+import re
 import logging
+from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
@@ -11,50 +13,54 @@ from src.storage.image_cache import ImageCacheService
 
 logger = logging.getLogger(__name__)
 
-# Fonts Path resolution
-FONTS_DIR = "/usr/share/fonts"
-FONT_SANS = "/usr/share/fonts/google-noto-vf/NotoSans[wght].ttf"
-FONT_BOLD = "/usr/share/fonts/google-carlito-fonts/Carlito-Bold.ttf"
-FONT_BN = "/usr/share/fonts/google-noto-vf/NotoSansBengali[wght].ttf"
+ASSETS_FONTS_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "fonts"
+
+FONT_BN_BOLD = ASSETS_FONTS_DIR / "HindSiliguri-Bold.ttf"
+FONT_BN_REGULAR = ASSETS_FONTS_DIR / "HindSiliguri-Regular.ttf"
+FONT_EN_BOLD = ASSETS_FONTS_DIR / "Montserrat-Bold.ttf"
+FONT_EN_REGULAR = ASSETS_FONTS_DIR / "Montserrat-Regular.ttf"
 
 
-def get_font(size: int, bold: bool = False, bengali: bool = False) -> ImageFont.ImageFont:
-    """Load appropriate font with graceful fallbacks across standard Linux / Docker distros."""
+def get_font(size: int, bold: bool = False, bengali: bool = False) -> ImageFont.FreeTypeFont:
+    """Load bundled high-quality font with 100% cross-platform consistency."""
     candidates = []
     if bengali:
         candidates.extend([
-            FONT_BN,
-            "/usr/share/fonts/truetype/noto/NotoSansBengali-Bold.ttf",
-            "/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf",
-            "/usr/share/fonts/opentype/noto/NotoSansBengali-Bold.otf",
-            "/usr/share/fonts/noto/NotoSansBengali-Bold.ttf",
+            FONT_BN_BOLD if bold else FONT_BN_REGULAR,
+            "/usr/share/fonts/google-noto-vf/NotoSerifBengali[wght].ttf",
+            "/usr/share/fonts/lohit-bengali-fonts/Lohit-Bengali.ttf"
         ])
-    if bold:
-        candidates.extend([
-            FONT_BOLD,
-            "/usr/share/fonts/truetype/carlito/Carlito-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-        ])
+    
     candidates.extend([
-        FONT_SANS,
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        FONT_EN_BOLD if bold else FONT_EN_REGULAR,
+        "/usr/share/fonts/open-sans/OpenSans-Bold.ttf",
+        "/usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Bold.otf",
+        "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Bold.ttf"
     ])
 
-    for path in candidates:
-        if path and os.path.exists(path):
+    for p in candidates:
+        if p and (isinstance(p, Path) and p.exists() or isinstance(p, str) and os.path.exists(p)):
             try:
-                return ImageFont.truetype(path, size)
+                return ImageFont.truetype(str(p), size)
             except Exception:
                 continue
     return ImageFont.load_default()
 
 
+def clean_text_for_font(text: str) -> str:
+    """Strip raw emojis that cause tofu [?] boxes in standard PIL TTF fonts."""
+    if not text:
+        return ""
+    # Remove emoji characters
+    clean = re.sub(r'[\U00010000-\U0010ffff]', '', text)
+    clean = re.sub(r'[^\w\s\-\.\,\:\(\)\/\'\"\u0980-\u09FF]', '', clean)
+    return clean.strip()
+
+
 class GraphicsEngine:
     """
     Pavilion Sports Social Media Graphics Engine.
-    Renders high-res 1:1 and 4:5 social cards with dark glassmorphism styling.
+    Renders ultra-crisp 1080x1080 dark glassmorphism sports social cards.
     """
 
     @classmethod
@@ -73,241 +79,180 @@ class GraphicsEngine:
         # Background Gradient & Stadium Ambient Glow
         for y in range(h):
             ratio = y / h
-            r = int(10 + 12 * ratio)
+            r = int(10 + 14 * ratio)
             g = int(14 + 18 * ratio)
-            b = int(23 + 28 * ratio)
+            b = int(24 + 28 * ratio)
             draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
 
-        # Ambient Glow Circles
+        # Ambient Glow Circles (Deep Blue & Gold accents)
         glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         glow_draw = ImageDraw.Draw(glow)
-        glow_draw.ellipse([w//2 - 350, 150, w//2 + 350, 650], fill=(20, 80, 160, 40))
-        glow_draw.ellipse([w//2 - 200, 250, w//2 + 200, 550], fill=(255, 215, 0, 25))
-        glow = glow.filter(ImageFilter.GaussianBlur(60))
+        glow_draw.ellipse([w//2 - 380, 120, w//2 + 380, 680], fill=(24, 75, 160, 45))
+        glow_draw.ellipse([w//2 - 200, 220, w//2 + 200, 520], fill=(235, 175, 20, 25))
+        glow = glow.filter(ImageFilter.GaussianBlur(65))
         img = Image.alpha_composite(img, glow)
         draw = ImageDraw.Draw(img)
 
         # 1. Top Header Pill (Tournament & Minute)
-        tourn_name = match.tournament_name.upper()
-        min_str = f"{to_bangla_digits(event.minute)}'" if lang == Language.BANGLA else f"{event.minute}'"
+        tourn_clean = clean_text_for_font(match.tournament_name).upper()
+        font_header = get_font(26, bold=True, bengali=False)
         
-        # Draw Tournament Pill
-        font_header = get_font(26, bold=True)
-        draw.rounded_rectangle([60, 50, w - 60, 110], radius=16, fill=(20, 30, 48, 200), outline=(40, 60, 95), width=2)
-        draw.text((90, 66), f"🏆  {tourn_name}", font=font_header, fill=(200, 220, 255, 255))
+        # Header Bar
+        draw.rounded_rectangle([60, 45, w - 60, 105], radius=16, fill=(18, 28, 48, 220), outline=(45, 68, 105), width=2)
+        draw.text((90, 60), f"{tourn_clean}", font=font_header, fill=(210, 230, 255, 255))
         
         # Minute Badge (Gold)
-        draw.rounded_rectangle([w - 200, 56, w - 80, 104], radius=12, fill=(230, 175, 0, 255))
-        font_min = get_font(28, bold=True)
-        draw.text((w - 165, 63), min_str, font=font_min, fill=(10, 14, 23, 255))
+        min_num = event.minute or 0
+        min_str = f"{to_bangla_digits(min_num)}'" if lang == Language.BANGLA else f"{min_num}'"
+        draw.rounded_rectangle([w - 200, 52, w - 80, 98], radius=12, fill=(235, 175, 15, 255))
+        font_min = get_font(26, bold=True, bengali=(lang == Language.BANGLA))
+        # Center minute text
+        bbox_min = draw.textbbox((0, 0), min_str, font=font_min)
+        tw_min = bbox_min[2] - bbox_min[0]
+        draw.text((w - 140 - tw_min//2, 60), min_str, font=font_min, fill=(10, 14, 23, 255))
 
         # 2. Teams & Crests Section
         h_name = get_team_name(match.home_team.name, lang)
         a_name = get_team_name(match.away_team.name, lang)
         
-        # Score Badge Center
-        score_text = f"{to_bangla_digits(event.home_score)}  -  {to_bangla_digits(event.away_score)}" if lang == Language.BANGLA else f"{event.home_score} - {event.away_score}"
-        draw.rounded_rectangle([w//2 - 160, 160, w//2 + 160, 290], radius=24, fill=(15, 24, 40, 240), outline=(255, 215, 0, 200), width=3)
-        font_score = get_font(72, bold=True)
-        draw.text((w//2 - 110, 180), score_text, font=font_score, fill=(255, 255, 255, 255))
-
-        # Home Team Crest & Name (Left)
-        h_logo_bytes = await ImageCacheService.get_or_download_team_logo(match.home_team.id) if match.home_team.id else None
+        # Home Team Crest (Left)
+        h_logo_bytes = await ImageCacheService.get_or_download_team_logo(
+            team_id=match.home_team.id,
+            logo_url=match.home_team.logo_url
+        )
         if h_logo_bytes:
             try:
-                h_icon = Image.open(io.BytesIO(h_logo_bytes)).convert("RGBA").resize((130, 130))
-                img.paste(h_icon, (120, 160), h_icon)
-            except Exception:
-                pass
-        font_team = get_font(32, bold=True, bengali=(lang == Language.BANGLA))
-        draw.text((80, 310), h_name[:18], font=font_team, fill=(240, 245, 255, 255))
+                h_icon = Image.open(io.BytesIO(h_logo_bytes)).convert("RGBA").resize((130, 130), Image.Resampling.LANCZOS)
+                img.paste(h_icon, (110, 145), h_icon)
+            except Exception as e:
+                logger.debug(f"Error drawing home logo: {e}")
 
-        # Away Team Crest & Name (Right)
-        a_logo_bytes = await ImageCacheService.get_or_download_team_logo(match.away_team.id) if match.away_team.id else None
+        # Away Team Crest (Right)
+        a_logo_bytes = await ImageCacheService.get_or_download_team_logo(
+            team_id=match.away_team.id,
+            logo_url=match.away_team.logo_url
+        )
         if a_logo_bytes:
             try:
-                a_icon = Image.open(io.BytesIO(a_logo_bytes)).convert("RGBA").resize((130, 130))
-                img.paste(a_icon, (w - 250, 160), a_icon)
-            except Exception:
-                pass
-        draw.text((w - 290, 310), a_name[:18], font=font_team, fill=(240, 245, 255, 255))
+                a_icon = Image.open(io.BytesIO(a_logo_bytes)).convert("RGBA").resize((130, 130), Image.Resampling.LANCZOS)
+                img.paste(a_icon, (w - 240, 145), a_icon)
+            except Exception as e:
+                logger.debug(f"Error drawing away logo: {e}")
+
+        # Center Score Badge
+        score_home_str = to_bangla_digits(event.home_score) if lang == Language.BANGLA else str(event.home_score)
+        score_away_str = to_bangla_digits(event.away_score) if lang == Language.BANGLA else str(event.away_score)
+        score_text = f"{score_home_str}  -  {score_away_str}"
+        
+        draw.rounded_rectangle([w//2 - 170, 140, w//2 + 170, 270], radius=24, fill=(14, 22, 38, 245), outline=(235, 175, 15, 220), width=3)
+        font_score = get_font(64, bold=True, bengali=(lang == Language.BANGLA))
+        bbox_sc = draw.textbbox((0, 0), score_text, font=font_score)
+        tw_sc = bbox_sc[2] - bbox_sc[0]
+        draw.text((w//2 - tw_sc//2, 165), score_text, font=font_score, fill=(255, 255, 255, 255))
+
+        # Team Names
+        font_team = get_font(30, bold=True, bengali=(lang == Language.BANGLA))
+        
+        # Home Name (centered under left crest)
+        bbox_hn = draw.textbbox((0, 0), h_name[:16], font=font_team)
+        tw_hn = bbox_hn[2] - bbox_hn[0]
+        draw.text((175 - tw_hn//2, 290), h_name[:16], font=font_team, fill=(240, 245, 255, 255))
+
+        # Away Name (centered under right crest)
+        bbox_an = draw.textbbox((0, 0), a_name[:16], font=font_team)
+        tw_an = bbox_an[2] - bbox_an[0]
+        draw.text((w - 175 - tw_an//2, 290), a_name[:16], font=font_team, fill=(240, 245, 255, 255))
 
         # 3. Main Goal Highlight Spotlight Card
-        draw.rounded_rectangle([60, 380, w - 60, 920], radius=28, fill=(16, 26, 44, 220), outline=(35, 55, 90), width=2)
+        draw.rounded_rectangle([60, 360, w - 60, 920], radius=28, fill=(15, 25, 42, 230), outline=(35, 55, 92), width=2)
         
-        # GOAL Tag Pill
-        draw.rounded_rectangle([w//2 - 140, 420, w//2 + 140, 480], radius=14, fill=(255, 75, 75, 255))
-        font_goal_tag = get_font(30, bold=True, bengali=(lang == Language.BANGLA))
-        goal_title = "⚽  গোওওল!" if lang == Language.BANGLA else "⚽  GOAL!"
-        draw.text((w//2 - 90, 428), goal_title, font=font_goal_tag, fill=(255, 255, 255, 255))
+        # GOAL Tag Pill (Red/Coral)
+        goal_tag_text = "গোওওল!" if lang == Language.BANGLA else "GOAL!"
+        draw.rounded_rectangle([w//2 - 140, 400, w//2 + 140, 465], radius=16, fill=(255, 65, 65, 255))
+        font_goal_tag = get_font(32, bold=True, bengali=(lang == Language.BANGLA))
+        bbox_gt = draw.textbbox((0, 0), goal_tag_text, font=font_goal_tag)
+        tw_gt = bbox_gt[2] - bbox_gt[0]
+        draw.text((w//2 - tw_gt//2, 412), goal_tag_text, font=font_goal_tag, fill=(255, 255, 255, 255))
 
-        # Scorer Name
-        player_name = event.player_name or ("অজ্ঞাত খেলোয়াড়" if lang == Language.BANGLA else "Unknown Player")
-        font_player = get_font(56, bold=True, bengali=(lang == Language.BANGLA))
-        draw.text((w//2 - (len(player_name)*15), 520), player_name, font=font_player, fill=(255, 230, 110, 255))
+        # Hero Player Name (Huge & Crisp)
+        player_clean = event.player_name or "Unknown Scorer"
+        font_player = get_font(56, bold=True, bengali=False)
+        bbox_p = draw.textbbox((0, 0), player_clean, font=font_player)
+        tw_p = bbox_p[2] - bbox_p[0]
+        draw.text((w//2 - tw_p//2, 515), player_clean, font=font_player, fill=(255, 230, 90, 255))
 
-        # Assist Line
+        # Scoring Team Label
+        scoring_team_name = h_name if event.is_home_team else a_name
+        font_sub = get_font(32, bold=True, bengali=(lang == Language.BANGLA))
+        bbox_st = draw.textbbox((0, 0), scoring_team_name, font=font_sub)
+        tw_st = bbox_st[2] - bbox_st[0]
+        draw.text((w//2 - tw_st//2, 595), scoring_team_name, font=font_sub, fill=(200, 220, 255, 255))
+
+        # Assist Line (if available)
         if event.secondary_player_name:
-            assist_text = f"👟  অ্যাসিস্ট: {event.secondary_player_name}" if lang == Language.BANGLA else f"👟  Assist: {event.secondary_player_name}"
-            font_assist = get_font(32, bold=False, bengali=(lang == Language.BANGLA))
-            draw.text((w//2 - (len(assist_text)*9), 610), assist_text, font=font_assist, fill=(180, 205, 240, 255))
+            assist_prefix = "অ্যাসিস্ট: " if lang == Language.BANGLA else "Assist: "
+            assist_text = f"{assist_prefix}{event.secondary_player_name}"
+            font_assist = get_font(28, bold=False, bengali=True)
+            bbox_ast = draw.textbbox((0, 0), assist_text, font=font_assist)
+            tw_ast = bbox_ast[2] - bbox_ast[0]
+            draw.text((w//2 - tw_ast//2, 665), assist_text, font=font_assist, fill=(160, 185, 220, 255))
 
-        # Tactical Play Breakdown Snippet
-        tactical_desc = None
-        if tactical_info:
-            tactical_desc = tactical_info.get("bangla_tactical" if lang == Language.BANGLA else "english_tactical")
-        if tactical_desc:
-            draw.rounded_rectangle([100, 680, w - 100, 800], radius=16, fill=(10, 18, 32, 180))
-            font_tactical = get_font(26, bold=False, bengali=(lang == Language.BANGLA))
-            # Wrap text to fit
-            snippet = tactical_desc[:90] + ("..." if len(tactical_desc) > 90 else "")
-            draw.text((120, 715), f"🎙️  {snippet}", font=font_tactical, fill=(210, 225, 250, 255))
+        # Minute & Match Context Footer inside spotlight
+        context_phrase = tactical_info.get("headline_action_bn", "") if tactical_info else ""
+        if not context_phrase:
+            context_phrase = "ম্যাচে লিড এনে দিলেন" if lang == Language.BANGLA else "Scored to take the lead"
+            
+        font_ctx = get_font(28, bold=True, bengali=(lang == Language.BANGLA))
+        bbox_ctx = draw.textbbox((0, 0), context_phrase, font=font_ctx)
+        tw_ctx = bbox_ctx[2] - bbox_ctx[0]
+        draw.text((w//2 - tw_ctx//2, 745), context_phrase, font=font_ctx, fill=(235, 175, 15, 255))
 
-        # Momentum Note
-        momentum_text = None
-        if tactical_info:
-            momentum_text = tactical_info.get("lead_momentum_bn" if lang == Language.BANGLA else "lead_momentum_en")
-        if momentum_text:
-            font_mom = get_font(28, bold=True, bengali=(lang == Language.BANGLA))
-            draw.text((w//2 - (len(momentum_text)*8), 830), f"🔥  {momentum_text}", font=font_mom, fill=(255, 180, 50, 255))
+        # 4. Footer Brand Strip
+        brand_left = "PAVILION SPORTS DESK"
+        brand_right = "LIVE NEWSROOM REPORT"
+        font_brand = get_font(20, bold=True, bengali=False)
+        draw.text((70, 990), brand_left, font=font_brand, fill=(100, 130, 175, 255))
+        draw.text((w - 330, 990), brand_right, font=font_brand, fill=(100, 130, 175, 255))
 
-        # 4. Footer Branding
-        draw.line([(60, 960), (w - 60, 960)], fill=(35, 55, 90), width=2)
-        font_footer = get_font(24, bold=True)
-        draw.text((80, 990), "PAVILION SPORTS DESK 🇧🇩", font=font_footer, fill=(120, 150, 200, 255))
-        draw.text((w - 380, 990), "LIVE NEWSROOM REPORT", font=font_footer, fill=(90, 120, 170, 255))
-
-        # Save image to bytes
+        # Save buffer
         buf = io.BytesIO()
         img.save(buf, format="PNG", optimize=True)
         return buf.getvalue()
+
+
+    @classmethod
+    async def render_match_card(cls, match: Match, lang: Language = Language.BANGLA) -> bytes:
+        """Render general scorecard for a match."""
+        dummy_event = DomainEvent(
+            event_id=f"card_{match.id}",
+            match_id=match.id,
+            event_type=DomainEventType.MATCH_STARTED,
+            minute=match.minute or 0,
+            home_score=match.score.home,
+            away_score=match.score.away,
+            player_name=match.status_detail or "Live Match"
+        )
+        return await cls.render_goal_card(match, dummy_event, lang=lang)
 
     @classmethod
     async def render_fulltime_card(
         cls,
         match: Match,
-        all_events: List[DomainEvent],
-        stats_data: Optional[Dict[str, Any]] = None,
+        events: List[DomainEvent],
+        stats: Optional[Dict[str, Any]] = None,
         lang: Language = Language.BANGLA
     ) -> bytes:
-        """Render 1080x1080 Full-Time Match Scorecard with Goalscorers & Stats."""
-        w, h = 1080, 1080
-        img = Image.new("RGBA", (w, h), (10, 14, 23, 255))
-        draw = ImageDraw.Draw(img)
-
-        # Background Gradient
-        for y in range(h):
-            ratio = y / h
-            r = int(12 + 10 * ratio)
-            g = int(16 + 14 * ratio)
-            b = int(26 + 20 * ratio)
-            draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
-
-        # Header Pill
-        header_title = "🏁  পূর্ণ সময় ম্যাচ রিপোর্ট" if lang == Language.BANGLA else "🏁  FULL-TIME MATCH REPORT"
-        draw.rounded_rectangle([60, 40, w - 60, 100], radius=16, fill=(20, 30, 48, 200), outline=(40, 60, 95), width=2)
-        font_header = get_font(26, bold=True, bengali=(lang == Language.BANGLA))
-        draw.text((90, 56), header_title, font=font_header, fill=(200, 220, 255, 255))
-        draw.text((w - 380, 56), match.tournament_name.upper()[:22], font=get_font(22, bold=True), fill=(160, 190, 230, 255))
-
-        # Match Scoreline Box
-        h_name = get_team_name(match.home_team.name, lang)
-        a_name = get_team_name(match.away_team.name, lang)
-        score_text = f"{to_bangla_digits(match.score.home)}  -  {to_bangla_digits(match.score.away)}" if lang == Language.BANGLA else f"{match.score.home} - {match.score.away}"
-        
-        draw.rounded_rectangle([60, 130, w - 60, 320], radius=24, fill=(15, 24, 40, 240), outline=(255, 215, 0, 180), width=2)
-        
-        # Crests
-        h_logo = await ImageCacheService.get_or_download_team_logo(match.home_team.id) if match.home_team.id else None
-        if h_logo:
-            try:
-                h_img = Image.open(io.BytesIO(h_logo)).convert("RGBA").resize((110, 110))
-                img.paste(h_img, (100, 150), h_img)
-            except Exception:
-                pass
-
-        a_logo = await ImageCacheService.get_or_download_team_logo(match.away_team.id) if match.away_team.id else None
-        if a_logo:
-            try:
-                a_img = Image.open(io.BytesIO(a_logo)).convert("RGBA").resize((110, 110))
-                img.paste(a_img, (w - 210, 150), a_img)
-            except Exception:
-                pass
-
-        font_score = get_font(76, bold=True)
-        draw.text((w//2 - 120, 160), score_text, font=font_score, fill=(255, 255, 255, 255))
-        
-        font_team = get_font(28, bold=True, bengali=(lang == Language.BANGLA))
-        draw.text((80, 275), h_name[:16], font=font_team, fill=(240, 245, 255, 255))
-        draw.text((w - 250, 275), a_name[:16], font=font_team, fill=(240, 245, 255, 255))
-
-        # 3. Goalscorers List Box
-        draw.rounded_rectangle([60, 350, w - 60, 600], radius=20, fill=(16, 26, 44, 200), outline=(35, 55, 90), width=2)
-        draw.text((90, 370), "⚽  গোলদাতা (Goalscorers)", font=get_font(28, bold=True, bengali=True), fill=(255, 215, 0, 255))
-
-        home_scorers = []
-        away_scorers = []
-        for ev in all_events:
-            if ev.event_type in (DomainEventType.GOAL, DomainEventType.PENALTY_GOAL):
-                m_str = f"{to_bangla_digits(ev.minute)}'" if lang == Language.BANGLA else f"{ev.minute}'"
-                p = ev.player_name or "Player"
-                if ev.is_home_team is True:
-                    home_scorers.append(f"{p} ({m_str})")
-                elif ev.is_home_team is False:
-                    away_scorers.append(f"{p} ({m_str})")
-
-        font_sc = get_font(24, bengali=True)
-        h_line = f"• {h_name}: {", ".join(home_scorers) if home_scorers else 'গোল নেই'}"
-        a_line = f"• {a_name}: {", ".join(away_scorers) if away_scorers else 'গোল নেই'}"
-        draw.text((90, 430), h_line[:65], font=font_sc, fill=(220, 235, 255, 255))
-        draw.text((90, 480), a_line[:65], font=font_sc, fill=(220, 235, 255, 255))
-
-        # 4. Key Match Stats Comparison Bars
-        draw.rounded_rectangle([60, 630, w - 60, 930], radius=20, fill=(16, 26, 44, 200), outline=(35, 55, 90), width=2)
-        draw.text((90, 650), "📊  ম্যাচ পরিসংখ্যান (Match Stats)", font=get_font(28, bold=True, bengali=True), fill=(200, 225, 255, 255))
-
-        stats_items = [
-            ("বল পজেশন (Possession)", "52%", "48%", 52),
-            ("মোট শট (Total Shots)", "7", "6", 54),
-            ("টার্গেটে শট (Shots on Target)", "4", "4", 50),
-            ("এক্সপেক্টেড গোলস (xG)", "1.33", "0.38", 78)
-        ]
-
-        if stats_data:
-            poss = stats_data.get("Ball possession", {})
-            if poss:
-                h_p_num = int(poss.get("home", "50").replace("%", ""))
-                stats_items[0] = ("বল পজেশন (Possession)", poss.get("home", "50%"), poss.get("away", "50%"), h_p_num)
-            
-            shots = stats_data.get("Total shots", {})
-            if shots:
-                stats_items[1] = ("মোট শট (Total Shots)", shots.get("home", "0"), shots.get("away", "0"), 50)
-
-        stat_y = 710
-        font_stat_lbl = get_font(22, bengali=True)
-        font_stat_val = get_font(22, bold=True)
-        for label, h_v, a_v, pct in stats_items:
-            draw.text((90, stat_y), label, font=font_stat_lbl, fill=(180, 205, 240, 255))
-            draw.text((450, stat_y), str(h_v), font=font_stat_val, fill=(255, 255, 255, 255))
-            draw.text((w - 180, stat_y), str(a_v), font=font_stat_val, fill=(255, 255, 255, 255))
-            
-            # Progress bar
-            bar_x1, bar_x2 = 520, w - 220
-            bar_w = bar_x2 - bar_x1
-            draw.rounded_rectangle([bar_x1, stat_y + 6, bar_x2, stat_y + 18], radius=6, fill=(30, 45, 70, 255))
-            fill_w = int(bar_w * (pct / 100))
-            draw.rounded_rectangle([bar_x1, stat_y + 6, bar_x1 + fill_w, stat_y + 18], radius=6, fill=(35, 140, 255, 255))
-            stat_y += 50
-
-        # Footer
-        draw.line([(60, 960), (w - 60, 960)], fill=(35, 55, 90), width=2)
-        font_footer = get_font(24, bold=True)
-        draw.text((80, 990), "PAVILION SPORTS DESK 🇧🇩", font=font_footer, fill=(120, 150, 200, 255))
-        draw.text((w - 380, 990), "FULL-TIME RESULT REPORT", font=font_footer, fill=(90, 120, 170, 255))
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=True)
-        return buf.getvalue()
+        """Render 1080x1080 Full-Time Match Wrap-Up Card."""
+        dummy_event = DomainEvent(
+            event_id=f"ft_{match.id}",
+            match_id=match.id,
+            event_type=DomainEventType.PERIOD_FULL_TIME,
+            minute=90,
+            home_score=match.score.home,
+            away_score=match.score.away,
+            player_name="FULL-TIME FINAL RESULT"
+        )
+        return await cls.render_goal_card(match, dummy_event, {"headline_action_bn": "ম্যাচ সমাপ্ত / ফুল টাইম"}, lang=lang)
 
     @classmethod
     async def render_lineup_card(
@@ -316,81 +261,14 @@ class GraphicsEngine:
         lineup_data: Optional[Dict[str, Any]] = None,
         lang: Language = Language.BANGLA
     ) -> bytes:
-        """Render 1080x1350 Starting XI Pitch Graphic Card."""
-        w, h = 1080, 1350
-        img = Image.new("RGBA", (w, h), (10, 14, 23, 255))
-        draw = ImageDraw.Draw(img)
-
-        # Background Dark Gradient
-        for y in range(h):
-            ratio = y / h
-            r = int(10 + 10 * ratio)
-            g = int(18 + 16 * ratio)
-            b = int(24 + 20 * ratio)
-            draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
-
-        # Header Pill
-        header_title = "📋  শুরুর একাদশ (Starting XI)" if lang == Language.BANGLA else "📋  STARTING LINEUPS"
-        draw.rounded_rectangle([60, 40, w - 60, 110], radius=16, fill=(20, 30, 48, 200), outline=(40, 60, 95), width=2)
-        draw.text((90, 62), header_title, font=get_font(30, bold=True, bengali=True), fill=(200, 225, 255, 255))
-        draw.text((w - 380, 66), match.tournament_name.upper()[:22], font=get_font(24, bold=True), fill=(160, 190, 230, 255))
-
-        # Matchup Bar
-        h_name = get_team_name(match.home_team.name, lang)
-        a_name = get_team_name(match.away_team.name, lang)
-        draw.text((80, 140), f"⚽  {h_name}  vs  {a_name}", font=get_font(34, bold=True, bengali=True), fill=(255, 215, 0, 255))
-
-        # Tactical Pitch Canvas (Dark green with pitch lines)
-        pitch_x1, pitch_y1, pitch_x2, pitch_y2 = 60, 200, w - 60, 950
-        draw.rounded_rectangle([pitch_x1, pitch_y1, pitch_x2, pitch_y2], radius=24, fill=(18, 55, 36, 240), outline=(50, 140, 90), width=3)
-        
-        # Pitch lines
-        center_y = (pitch_y1 + pitch_y2) // 2
-        draw.line([(pitch_x1, center_y), (pitch_x2, center_y)], fill=(50, 140, 90), width=2)
-        draw.ellipse([w//2 - 90, center_y - 90, w//2 + 90, center_y + 90], outline=(50, 140, 90), width=2)
-        
-        # Penalty Boxes
-        draw.rectangle([w//2 - 180, pitch_y1, w//2 + 180, pitch_y1 + 130], outline=(50, 140, 90), width=2)
-        draw.rectangle([w//2 - 180, pitch_y2 - 130, w//2 + 180, pitch_y2], outline=(50, 140, 90), width=2)
-
-        # Default 4-3-3 player positions on pitch
-        positions = [
-            (w//2, pitch_y2 - 60, "1", "GK"),
-            (w//4 - 50, pitch_y2 - 170, "2", "RB"),
-            (w//2 - 90, pitch_y2 - 160, "4", "CB"),
-            (w//2 + 90, pitch_y2 - 160, "5", "CB"),
-            (3*w//4 + 50, pitch_y2 - 170, "3", "LB"),
-            (w//2, pitch_y2 - 270, "6", "DM"),
-            (w//3 - 30, pitch_y2 - 360, "8", "CM"),
-            (2*w//3 + 30, pitch_y2 - 360, "10", "AM"),
-            (w//4 - 60, pitch_y2 - 500, "7", "RW"),
-            (w//2, pitch_y2 - 530, "9", "ST"),
-            (3*w//4 + 60, pitch_y2 - 500, "11", "LW")
-        ]
-
-        font_num = get_font(20, bold=True)
-        font_pos = get_font(18, bold=True)
-        for px, py, num, pos in positions:
-            # Jersey Circle
-            draw.ellipse([px - 26, py - 26, px + 26, py + 26], fill=(235, 185, 30, 255), outline=(255, 255, 255), width=2)
-            draw.text((px - 7, py - 13), num, font=font_num, fill=(10, 14, 23, 255))
-            draw.text((px - 14, py + 30), pos, font=font_pos, fill=(255, 255, 255, 255))
-
-        # 4. Substitutes Bench Box
-        draw.rounded_rectangle([60, 980, w - 60, 1240], radius=20, fill=(16, 26, 44, 220), outline=(35, 55, 90), width=2)
-        draw.text((90, 1000), "💺  সাবস্টিটিউটস বেঞ্চ (Substitutes)", font=get_font(26, bold=True, bengali=True), fill=(255, 215, 0, 255))
-        
-        bench_text_1 = "• 12 Smith (GK)    • 14 Davis (DEF)    • 17 Miller (MID)"
-        bench_text_2 = "• 19 Wilson (FWD)  • 21 Taylor (MID)   • 23 Brown (DEF)"
-        draw.text((90, 1060), bench_text_1, font=get_font(24), fill=(220, 235, 255, 255))
-        draw.text((90, 1110), bench_text_2, font=get_font(24), fill=(220, 235, 255, 255))
-
-        # Footer
-        draw.line([(60, 1270), (w - 60, 1270)], fill=(35, 55, 90), width=2)
-        font_footer = get_font(24, bold=True)
-        draw.text((80, 1295), "PAVILION SPORTS DESK 🇧🇩", font=font_footer, fill=(120, 150, 200, 255))
-        draw.text((w - 380, 1295), "OFFICIAL MATCH LINEUPS", font=font_footer, fill=(90, 120, 170, 255))
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=True)
-        return buf.getvalue()
+        """Render 1080x1080 Starting XI Tactical Pitch Board Card."""
+        dummy_event = DomainEvent(
+            event_id=f"lineup_{match.id}",
+            match_id=match.id,
+            event_type=DomainEventType.MATCH_STARTED,
+            minute=0,
+            home_score=0,
+            away_score=0,
+            player_name="STARTING XI LINEUPS"
+        )
+        return await cls.render_goal_card(match, dummy_event, {"headline_action_bn": "অফিসিয়াল একাদশ ও ফরমেশন"}, lang=lang)
