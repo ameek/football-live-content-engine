@@ -77,9 +77,14 @@ class TelegramBotListener:
 
     async def _handle_update(self, update: Dict[str, Any]):
         """Route incoming message or callback query."""
-        if "message" in update:
-            msg = update["message"]
-            text = (msg.get("text") or "").strip()
+        msg = (
+            update.get("message")
+            or update.get("channel_post")
+            or update.get("edited_message")
+            or update.get("edited_channel_post")
+        )
+        if msg:
+            text = (msg.get("text") or msg.get("caption") or "").strip()
             chat_id = msg.get("chat", {}).get("id")
             if text.startswith("/") and chat_id:
                 await self._handle_command(text, chat_id, msg)
@@ -92,7 +97,7 @@ class TelegramBotListener:
         parts = text.split()
         cmd = parts[0].lower().replace("@football_post_bot", "")
 
-        if cmd in ("/start", "/help"):
+        if cmd == "/start" or cmd.startswith("/start") or cmd in ("/help", "/list", "/commands"):
             help_text = (
                 "⚽ <b>Pavilion Football Remote Desk Controller</b> 📡\n\n"
                 "Welcome to the automated sports newsroom controller bot!\n\n"

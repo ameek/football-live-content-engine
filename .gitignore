@@ -31,3 +31,5 @@ data/cache/
 *.swp
 *.swo
 .DS_Store
+.vercel
+.env*
