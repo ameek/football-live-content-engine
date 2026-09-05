@@ -59,10 +59,12 @@ class MatchMonitor:
         paths.append(Path("/tmp/desk_state.json"))
         base_dir = Path(__file__).resolve().parent.parent.parent
         paths.append(base_dir / "data" / "desk_state.json")
+        paths.append(Path.cwd() / "data" / "desk_state.json")
         return paths
 
     def _load_persisted_state(self):
         """Restore active monitored matches and Night Shift config across serverless cold starts."""
+        loaded = False
         for path in self._get_state_file_paths():
             if path.exists():
                 try:
@@ -70,14 +72,17 @@ class MatchMonitor:
                         data = json.load(f)
 
                     if "night_shift" in data and isinstance(data["night_shift"], dict):
-                        self.night_shift = NightShiftConfig.model_validate(data["night_shift"])
+                        if not self.night_shift.active or not loaded:
+                            self.night_shift = NightShiftConfig.model_validate(data["night_shift"])
 
                     if "tracked_matches" in data and isinstance(data["tracked_matches"], dict):
                         for match_id, m_dict in data["tracked_matches"].items():
-                            self.monitored_matches[match_id] = Match.model_validate(m_dict)
+                            if match_id not in self.monitored_matches:
+                                self.monitored_matches[match_id] = Match.model_validate(m_dict)
 
-                    logger.info(f"Loaded persistent desk state from {path} with {len(self.monitored_matches)} tracked matches (Night Shift active: {self.night_shift.active}).")
-                    return
+                    if self.monitored_matches:
+                        loaded = True
+                        logger.info(f"Loaded persistent desk state from {path} with {len(self.monitored_matches)} tracked matches (Night Shift active: {self.night_shift.active}).")
                 except Exception as e:
                     logger.error(f"Failed to load desk state from {path}: {e}")
 

@@ -49,6 +49,13 @@ async def get_live_matches(league: Optional[str] = None, monitor: MatchMonitor =
             m.auto_publish = tracked.auto_publish
             m.language = tracked.language
             m.voice_style = tracked.voice_style
+        elif m.id in monitor.night_shift.active_match_ids:
+            m.auto_generate = True
+            m.coverage = monitor.night_shift.default_coverage
+            m.auto_publish = monitor.night_shift.default_auto_publish
+            m.language = monitor.night_shift.default_language
+            m.voice_style = NewsVoiceStyle.BREAKING
+            monitor.monitored_matches[m.id] = m
         else:
             m.auto_generate = False
             m.auto_publish = False
@@ -82,6 +89,13 @@ async def get_scheduled_matches(date_str: Optional[str] = None, league: Optional
             m.auto_publish = tracked.auto_publish
             m.language = tracked.language
             m.voice_style = tracked.voice_style
+        elif m.id in monitor.night_shift.active_match_ids:
+            m.auto_generate = True
+            m.coverage = monitor.night_shift.default_coverage
+            m.auto_publish = monitor.night_shift.default_auto_publish
+            m.language = monitor.night_shift.default_language
+            m.voice_style = NewsVoiceStyle.BREAKING
+            monitor.monitored_matches[m.id] = m
         else:
             m.auto_generate = False
             m.auto_publish = False
