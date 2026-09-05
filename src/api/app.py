@@ -699,6 +699,7 @@ DASHBOARD_HTML = """
             await fetchNightShiftStatus();
             await fetchMatches();
             await fetchCalendarMatches();
+            await fetchEvents();
             await fetchPosts();
             setupWebSocket();
 
@@ -706,11 +707,12 @@ DASHBOARD_HTML = """
             setInterval(async () => {
                 try {
                     await fetchMatches();
+                    await fetchEvents();
                     await fetchPosts();
                 } catch (e) {
                     console.error('Auto-sync error:', e);
                 }
-            }, 10000);
+            }, 8000);
 
             document.addEventListener('click', (e) => {
                 const liveDrop = document.getElementById('custom-league-dropdown-container');
@@ -1141,11 +1143,15 @@ DASHBOARD_HTML = """
                 const res = await secureFetch('/api/monitor/poll-now', { method: 'POST' });
                 if (res && res.ok) {
                     const data = await res.json();
-                    showToast(`✓ Pitch ticker synced! (${data.total_events_count} events total)`);
+                    await fetchEvents();
                     await fetchMatches();
+                    showToast(`✓ Pitch ticker synced! (${data.total_events_count} incidents live)`);
+                } else {
+                    await fetchEvents();
                 }
             } catch (err) {
                 console.error(err);
+                await fetchEvents();
             }
             btn.innerHTML = '<span>🔄</span> <span>Sync</span>';
         }
@@ -1159,11 +1165,85 @@ DASHBOARD_HTML = """
                     const data = await res.json();
                     await fetchPosts();
                     showToast(`✓ Post queue refreshed! (${data.total_posts_count} posts)`);
+                } else {
+                    await fetchPosts();
                 }
             } catch (err) {
                 console.error(err);
+                await fetchPosts();
             }
             btn.innerHTML = '<span>🔄</span> <span>Sync</span>';
+        }
+
+        async function fetchEvents() {
+            try {
+                const res = await fetch('/api/events');
+                if (!res.ok) return;
+                const events = await res.json();
+                const container = document.getElementById('events-container');
+
+                if (!events || events.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-16 px-4">
+                            <div class="w-12 h-12 rounded-full bg-slate-800/60 mx-auto flex items-center justify-center text-xl mb-3">📡</div>
+                            <p class="text-slate-300 text-xs font-semibold">No Events Yet</p>
+                            <p class="text-slate-500 text-[11px] mt-1">Click <strong>+ Track</strong> on any match to start streaming live pitch incidents.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = events.map(ev => {
+                    let icon = '⚡';
+                    let typeBadge = ev.event_type;
+                    let badgeBg = 'bg-slate-800 text-slate-300';
+                    let borderColor = 'border-slate-800';
+
+                    if (ev.event_type.includes('GOAL')) {
+                        icon = '⚽';
+                        badgeBg = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                        borderColor = 'border-emerald-500/40 bg-emerald-950/20';
+                    } else if (ev.event_type.includes('RED_CARD')) {
+                        icon = '🟥';
+                        badgeBg = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+                        borderColor = 'border-rose-500/40 bg-rose-950/20';
+                    } else if (ev.event_type.includes('YELLOW_CARD')) {
+                        icon = '🟨';
+                        badgeBg = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                        borderColor = 'border-amber-500/30 bg-amber-950/10';
+                    } else if (ev.event_type.includes('VAR')) {
+                        icon = '📺';
+                        badgeBg = 'bg-purple-500/20 text-purple-400 border border-purple-500/30';
+                        borderColor = 'border-purple-500/30 bg-purple-950/10';
+                    } else if (ev.event_type.includes('SUBSTITUTION')) {
+                        icon = '🔄';
+                        badgeBg = 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+                    } else if (ev.event_type.includes('PERIOD')) {
+                        icon = '⏱️';
+                        badgeBg = 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30';
+                        borderColor = 'border-cyan-500/30 bg-cyan-950/10';
+                    }
+
+                    return `
+                        <div class="p-3 rounded-xl bg-[#070c16] ${borderColor} text-xs flex flex-col gap-1.5 shadow-md transition hover:border-slate-700">
+                            <div class="flex justify-between items-center font-bold text-slate-200">
+                                <span class="flex items-center gap-1.5 truncate">
+                                    <span class="text-sm">${icon}</span>
+                                    <span class="text-cyan-300 font-semibold">${ev.team_name || 'Match Event'}</span>
+                                </span>
+                                <span class="font-mono text-emerald-400 text-xs px-1.5 py-0.5 rounded bg-slate-800">${ev.minute}'</span>
+                            </div>
+                            <div class="text-white font-medium leading-relaxed pl-5">${ev.description}</div>
+                            <div class="text-slate-400 text-[10px] flex justify-between pt-1 border-t border-slate-800/80 pl-5">
+                                <span>Score: <strong class="text-slate-200">${ev.home_score} - ${ev.away_score}</strong></span>
+                                <span class="font-mono text-[9px] px-1.5 py-0.5 rounded ${badgeBg}">${typeBadge}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Error fetching events:', err);
+            }
         }
 
         async function fetchPosts() {

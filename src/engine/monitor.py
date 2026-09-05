@@ -80,20 +80,28 @@ class MatchMonitor:
                             if match_id not in self.monitored_matches:
                                 self.monitored_matches[match_id] = Match.model_validate(m_dict)
 
-                    if self.monitored_matches:
+                    if "generated_posts" in data and isinstance(data["generated_posts"], list):
+                        self.generated_posts = [GeneratedPost.model_validate(p) for p in data["generated_posts"]]
+
+                    if "all_events_history" in data and isinstance(data["all_events_history"], list):
+                        self.all_events_history = [DomainEvent.model_validate(e) for e in data["all_events_history"]]
+
+                    if self.monitored_matches or self.generated_posts or self.all_events_history:
                         loaded = True
-                        logger.info(f"Loaded persistent desk state from {path} with {len(self.monitored_matches)} tracked matches (Night Shift active: {self.night_shift.active}).")
+                        logger.info(f"Loaded persistent desk state from {path} with {len(self.monitored_matches)} tracked matches, {len(self.generated_posts)} posts, {len(self.all_events_history)} events.")
                 except Exception as e:
                     logger.error(f"Failed to load desk state from {path}: {e}")
 
     def _save_persisted_state(self):
-        """Persist monitored matches and Night Shift status to disk."""
+        """Persist monitored matches, Night Shift status, posts, and event history to disk."""
         try:
             state_dict = {
                 "night_shift": self.night_shift.model_dump(mode="json"),
                 "tracked_matches": {
                     mid: m.model_dump(mode="json") for mid, m in self.monitored_matches.items()
-                }
+                },
+                "generated_posts": [p.model_dump(mode="json") for p in self.generated_posts[-50:]],
+                "all_events_history": [e.model_dump(mode="json") for e in self.all_events_history[-100:]]
             }
             tmp_path = Path("/tmp/desk_state.json")
             with open(tmp_path, "w", encoding="utf-8") as f:
@@ -268,5 +276,8 @@ class MatchMonitor:
                         "event": event.model_dump(mode="json"),
                         "match": live_match.model_dump(mode="json")
                     })
+
+        if new_posts_created or self.all_events_history:
+            self._save_persisted_state()
 
         return new_posts_created

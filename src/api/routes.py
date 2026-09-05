@@ -258,12 +258,34 @@ async def save_coverage_settings(settings: CoverageSettings):
     return global_coverage_settings
 
 
+@router.get("/events", response_model=List[DomainEvent])
+async def get_events_stream(match_id: Optional[str] = None, monitor: MatchMonitor = Depends(get_monitor)):
+    """Retrieve pitch incidents timeline across monitored matches."""
+    if not monitor.all_events_history and monitor.monitored_matches:
+        for mid in list(monitor.monitored_matches.keys()):
+            incidents = await monitor.provider.get_match_events(mid)
+            for ev in incidents:
+                if not any(e.event_id == ev.event_id for e in monitor.all_events_history):
+                    monitor.all_events_history.append(ev)
+        if monitor.all_events_history:
+            monitor._save_persisted_state()
+
+    ev_list = list(reversed(monitor.all_events_history))
+    if match_id:
+        ev_list = [e for e in ev_list if e.match_id == match_id]
+    return ev_list[:60]
+
+
 @router.get("/posts", response_model=List[GeneratedPost])
 async def get_generated_posts(status: Optional[PostStatus] = None, monitor: MatchMonitor = Depends(get_monitor)):
     """Retrieve generated sports posts."""
+    if not monitor.generated_posts and monitor.monitored_matches:
+        await monitor.poll_once()
+
+    posts = list(reversed(monitor.generated_posts))
     if status:
-        return [p for p in monitor.generated_posts if p.status == status]
-    return monitor.generated_posts
+        return [p for p in posts if p.status == status]
+    return posts
 
 
 class TelegramConfigRequest(BaseModel):
