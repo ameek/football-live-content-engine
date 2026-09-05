@@ -239,6 +239,41 @@ async def test_telegram_connection(monitor: MatchMonitor = Depends(get_monitor))
     return await monitor.telegram_publisher.test_connection()
 
 
+@router.post("/telegram/webhook")
+async def telegram_webhook(req_body: Dict[str, Any]):
+    """Serverless Webhook entrypoint for Telegram Bot updates."""
+    from src.api.app import app_state
+    if app_state.bot_listener:
+        await app_state.bot_listener._handle_update(req_body)
+    return {"ok": True}
+
+
+@router.get("/telegram/set-webhook")
+@router.post("/telegram/set-webhook")
+async def set_telegram_webhook(webhook_url: str, monitor: MatchMonitor = Depends(get_monitor)):
+    """Configure Telegram to deliver real-time bot updates to this Vercel Serverless URL."""
+    import httpx
+    if not monitor.telegram_publisher.bot_token:
+        raise HTTPException(status_code=400, detail="TELEGRAM_BOT_TOKEN not configured")
+    api_url = f"https://api.telegram.org/bot{monitor.telegram_publisher.bot_token}/setWebhook"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(api_url, json={"url": webhook_url, "allowed_updates": ["message", "callback_query"]})
+        return resp.json()
+
+
+@router.get("/cron/poll")
+@router.post("/cron/poll")
+async def vercel_cron_poll(monitor: MatchMonitor = Depends(get_monitor)):
+    """Vercel Cron periodically polls live matches and dispatches new posts to Telegram."""
+    new_posts = await monitor.poll_once()
+    return {
+        "status": "cron_success",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "monitored_matches": len(monitor.monitored_matches),
+        "new_posts": len(new_posts)
+    }
+
+
 @router.patch("/posts/{post_id}")
 async def update_post(post_id: str, req: UpdatePostRequest, monitor: MatchMonitor = Depends(get_monitor)):
     """Edit, Approve, Reject, or Publish a generated post."""
