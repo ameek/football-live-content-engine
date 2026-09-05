@@ -7,12 +7,20 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "cache" / "logos"
+# In serverless environments (Vercel/AWS Lambda), /var/task is read-only. Use /tmp instead.
+if Path("/tmp").exists() and os.access("/tmp", os.W_OK):
+    CACHE_DIR = Path("/tmp/data/cache/logos")
+else:
+    CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "cache" / "logos"
+
 TEAMS_DIR = CACHE_DIR / "teams"
 TOURNAMENTS_DIR = CACHE_DIR / "tournaments"
 
-TEAMS_DIR.mkdir(parents=True, exist_ok=True)
-TOURNAMENTS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    TEAMS_DIR.mkdir(parents=True, exist_ok=True)
+    TOURNAMENTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    logger.debug(f"Cache dir creation deferred or running in read-only environment: {e}")
 
 
 class ImageCacheService:
@@ -53,7 +61,11 @@ class ImageCacheService:
             async with httpx.AsyncClient(headers=cls.HEADERS, timeout=10.0) as client:
                 resp = await client.get(url, follow_redirects=True)
                 if resp.status_code == 200 and resp.content:
-                    local_file.write_bytes(resp.content)
+                    try:
+                        local_file.parent.mkdir(parents=True, exist_ok=True)
+                        local_file.write_bytes(resp.content)
+                    except Exception:
+                        pass
                     return resp.content
         except Exception as e:
             logger.debug(f"Could not download team logo {url}: {e}")
@@ -82,7 +94,11 @@ class ImageCacheService:
             async with httpx.AsyncClient(headers=cls.HEADERS, timeout=10.0) as client:
                 resp = await client.get(url, follow_redirects=True)
                 if resp.status_code == 200 and resp.content:
-                    local_file.write_bytes(resp.content)
+                    try:
+                        local_file.parent.mkdir(parents=True, exist_ok=True)
+                        local_file.write_bytes(resp.content)
+                    except Exception:
+                        pass
                     return resp.content
         except Exception as e:
             logger.debug(f"Could not download tournament logo {url}: {e}")
