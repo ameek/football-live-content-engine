@@ -403,9 +403,28 @@ class LiveFeedProvider(FootballDataProvider):
 
         return matches
 
+    async def _resolve_live_id(self, match_id: str) -> str:
+        """Resolve scheduled match fixture ID (e.g. sched_101) to active Sofascore Live ID if match is in-play."""
+        if not match_id.startswith("sched_"):
+            return match_id
+
+        scheduled = await self.get_scheduled_matches()
+        target = next((s for s in scheduled if s.id == match_id), None)
+        if not target:
+            return match_id
+
+        live = await self.get_live_matches()
+        for l in live:
+            h_match = target.home_team.name.lower() in l.home_team.name.lower() or l.home_team.name.lower() in target.home_team.name.lower()
+            a_match = target.away_team.name.lower() in l.away_team.name.lower() or l.away_team.name.lower() in target.away_team.name.lower()
+            if h_match and a_match:
+                return l.id
+        return match_id
+
     async def get_match_by_id(self, match_id: str) -> Optional[Match]:
         """Fetch single match metadata."""
-        url = f"{self.BASE_URL}/event/{match_id}"
+        target_id = await self._resolve_live_id(match_id)
+        url = f"{self.BASE_URL}/event/{target_id}"
         try:
             async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout) as client:
                 response = await client.get(url)
@@ -426,7 +445,7 @@ class LiveFeedProvider(FootballDataProvider):
                 tourn_logo = f"/api/logos/tournament/{unique_id}" if unique_id else None
 
                 return Match(
-                    id=str(ev.get("id")),
+                    id=match_id,
                     tournament_name=ev.get("tournament", {}).get("name", "Football"),
                     tournament_category=ev.get("tournament", {}).get("category", {}).get("name", "Football"),
                     tournament_logo_url=tourn_logo,
@@ -456,7 +475,8 @@ class LiveFeedProvider(FootballDataProvider):
 
     async def get_match_comments(self, match_id: str) -> List[Dict[str, Any]]:
         """Fetch live play-by-play text commentary comments for a match."""
-        url = f"{self.BASE_URL}/event/{match_id}/comments"
+        target_id = await self._resolve_live_id(match_id)
+        url = f"{self.BASE_URL}/event/{target_id}/comments"
         try:
             async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout) as client:
                 resp = await client.get(url)
@@ -468,7 +488,8 @@ class LiveFeedProvider(FootballDataProvider):
 
     async def get_match_statistics(self, match_id: str) -> Dict[str, Any]:
         """Fetch match overview and shot statistics."""
-        url = f"{self.BASE_URL}/event/{match_id}/statistics"
+        target_id = await self._resolve_live_id(match_id)
+        url = f"{self.BASE_URL}/event/{target_id}/statistics"
         try:
             async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout) as client:
                 resp = await client.get(url)
@@ -498,7 +519,8 @@ class LiveFeedProvider(FootballDataProvider):
         Fetch all chronological incidents for a match, reconstruct running score timeline,
         and normalize into DomainEvents.
         """
-        url = f"{self.BASE_URL}/event/{match_id}/incidents"
+        target_id = await self._resolve_live_id(match_id)
+        url = f"{self.BASE_URL}/event/{target_id}/incidents"
         events: List[DomainEvent] = []
 
         try:

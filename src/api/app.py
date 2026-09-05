@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Football Night-Shift Newsroom Engine",
     description="Automated Overnight Football Monitoring & Bangla/English Sports Post Generator",
-    version="0.3.2",
+    version=settings.version,
     lifespan=lifespan
 )
 
@@ -104,6 +104,7 @@ DASHBOARD_HTML = """
                     <div class="flex items-center gap-2">
                         <h1 class="text-lg font-extrabold tracking-tight text-white">FOOTBALL DESK</h1>
                         <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">Remote Desk</span>
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-extrabold border border-emerald-500/30">v2.6.0</span>
                     </div>
                     <p class="text-xs text-slate-400">অটোমেটেড ফুটবল মনিটরিং ও ব্রেকিং নিউজ পাবলিশার</p>
                 </div>

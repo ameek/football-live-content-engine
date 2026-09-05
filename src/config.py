@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     ai_model_name: str = "gpt-4o-mini"
     enable_auto_publish: bool = False
 
+    # Version & Release Metadata
+    version: str = "v2.6.0"
+
     # Security & Access Control
     desk_security_pin: str = "2026"
 
@@ -42,3 +45,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

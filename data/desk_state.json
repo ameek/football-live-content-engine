@@ -11,37 +11,37 @@
       "sched_104",
       "sched_105"
     ],
-    "started_at": "2026-09-05T12:13:27.518628Z"
+    "started_at": "2026-09-05T12:35:37.114138Z"
   },
   "tracked_matches": {
     "sched_101": {
       "id": "sched_101",
       "tournament_name": "Premier League",
       "tournament_category": "England",
-      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+      "tournament_logo_url": "/api/logos/tournament/17",
       "home_team": {
-        "id": null,
+        "id": "39",
         "name": "Newcastle United",
         "bangla_name": null,
-        "short_name": null,
-        "logo_url": "https://api.sofascore.app/api/v1/team/39/image"
+        "short_name": "Newcastle",
+        "logo_url": "/api/logos/team/39"
       },
       "away_team": {
-        "id": null,
+        "id": "60",
         "name": "Bournemouth",
         "bangla_name": null,
-        "short_name": null,
-        "logo_url": "https://api.sofascore.app/api/v1/team/60/image"
+        "short_name": "Bournemouth",
+        "logo_url": "/api/logos/team/60"
       },
-      "status": "NOT_STARTED",
-      "status_detail": "5:30 PM BDT (17:30)",
+      "status": "IN_PROGRESS",
+      "status_detail": "2nd half",
       "minute": null,
       "score": {
-        "home": 0,
-        "away": 0
+        "home": 1,
+        "away": 2
       },
-      "start_time": "2026-09-05T11:30:00Z",
-      "last_updated": "2026-09-05T12:13:27.507507Z",
+      "start_time": null,
+      "last_updated": "2026-09-05T12:35:37.101656Z",
       "coverage": "STANDARD",
       "auto_generate": true,
       "auto_publish": true,
