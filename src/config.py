@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     ai_model_name: str = "gpt-4o-mini"
     enable_auto_publish: bool = False
 
+    # Security & Access Control
+    desk_security_pin: str = "2026"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="FOOTBALL_",

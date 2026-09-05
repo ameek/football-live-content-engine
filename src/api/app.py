@@ -111,6 +111,12 @@ DASHBOARD_HTML = """
 
             <!-- Top Actions -->
             <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                <!-- Security Lock/Unlock Status -->
+                <button id="desk-lock-btn" onclick="toggleDeskAuthModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-sm" title="Authenticate with Desk Security PIN">
+                    <span id="desk-lock-icon">🔒</span>
+                    <span id="desk-lock-text">Desk Locked</span>
+                </button>
+
                 <div id="ws-badge" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span>Live Socket</span>
@@ -505,6 +511,35 @@ DASHBOARD_HTML = """
         </div>
     </div>
 
+    <!-- ================= Security PIN Verification Modal ================= -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0b1322] border border-slate-700/80 w-full max-w-sm rounded-2xl p-6 shadow-2xl flex flex-col">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-lg">
+                        🔐
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Desk Security PIN</h3>
+                        <p class="text-[11px] text-slate-400">Authentication required for roster edits</p>
+                    </div>
+                </div>
+                <button onclick="closeAuthModal()" class="text-slate-400 hover:text-white text-base px-1">✕</button>
+            </div>
+            <div class="py-4 space-y-3">
+                <p class="text-xs text-slate-300">Enter your Security PIN to unlock administrative controls:</p>
+                <input type="password" id="auth-pin-input" maxlength="10" placeholder="••••" onkeydown="if(event.key==='Enter') submitAuthPin()" class="w-full bg-[#070c16] border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl px-4 py-3 text-center text-xl font-mono tracking-widest text-white placeholder-slate-600 focus:outline-none transition">
+                <p id="auth-error-msg" class="text-rose-400 text-xs font-semibold hidden text-center">❌ Invalid Security PIN. Please try again.</p>
+            </div>
+            <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+                <button onclick="closeAuthModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Cancel</button>
+                <button onclick="submitAuthPin()" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20 transition flex items-center gap-1.5">
+                    <span>🔓</span> <span>Unlock Controls</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Floating Copy Toast -->
     <div id="copy-toast" class="fixed bottom-6 right-6 bg-emerald-600 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl shadow-emerald-950/80 border border-emerald-400/40 hidden transition duration-300 flex items-center gap-2 z-50">
         <span>✓</span> <span id="toast-text">Copied to clipboard!</span>
@@ -519,6 +554,120 @@ DASHBOARD_HTML = """
         let currentCalendarDate = "today";
         let nightShiftActive = false;
         let nightShiftActiveMatchIds = [];
+
+        function getSavedPin() {
+            return localStorage.getItem('desk_security_pin') || '';
+        }
+
+        function updateLockUI() {
+            const pin = getSavedPin();
+            const btn = document.getElementById('desk-lock-btn');
+            const icon = document.getElementById('desk-lock-icon');
+            const text = document.getElementById('desk-lock-text');
+            if (btn && icon && text) {
+                if (pin) {
+                    btn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition flex items-center gap-1.5 shadow-sm";
+                    icon.innerText = "🔓";
+                    text.innerText = "Admin Unlocked";
+                    btn.title = "Click to Lock Desk Controls";
+                } else {
+                    btn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-sm";
+                    icon.innerText = "🔒";
+                    text.innerText = "Desk Locked";
+                    btn.title = "Click to Authenticate with PIN";
+                }
+            }
+        }
+
+        function toggleDeskAuthModal() {
+            if (getSavedPin()) {
+                if (confirm("Lock administrative controls? You will need to enter the Security PIN again to modify tracking or night shift.")) {
+                    localStorage.removeItem('desk_security_pin');
+                    updateLockUI();
+                    showToast("🔒 Desk controls locked.");
+                }
+            } else {
+                openAuthModal();
+            }
+        }
+
+        let pendingAuthCallback = null;
+
+        function openAuthModal(callback) {
+            pendingAuthCallback = callback || null;
+            const input = document.getElementById('auth-pin-input');
+            if (input) input.value = '';
+            const err = document.getElementById('auth-error-msg');
+            if (err) err.classList.add('hidden');
+            const modal = document.getElementById('auth-modal');
+            if (modal) modal.classList.remove('hidden');
+            setTimeout(() => { if (input) input.focus(); }, 100);
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            if (modal) modal.classList.add('hidden');
+            pendingAuthCallback = null;
+        }
+
+        async function submitAuthPin() {
+            const pin = (document.getElementById('auth-pin-input').value || '').trim();
+            if (!pin) return;
+            try {
+                const res = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: pin })
+                });
+                if (res.ok) {
+                    localStorage.setItem('desk_security_pin', pin);
+                    updateLockUI();
+                    closeAuthModal();
+                    showToast("🔓 Desk administrative controls unlocked!");
+                    if (pendingAuthCallback) {
+                        const cb = pendingAuthCallback;
+                        pendingAuthCallback = null;
+                        await cb();
+                    }
+                } else {
+                    document.getElementById('auth-error-msg').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('auth-error-msg').classList.remove('hidden');
+            }
+        }
+
+        async function secureFetch(url, options = {}) {
+            const pin = getSavedPin();
+            if (!pin) {
+                return new Promise((resolve) => {
+                    openAuthModal(async () => {
+                        const res = await secureFetch(url, options);
+                        resolve(res);
+                    });
+                });
+            }
+
+            options.headers = options.headers || {};
+            if (options.headers instanceof Headers) {
+                options.headers.set('X-Desk-PIN', pin);
+            } else {
+                options.headers['X-Desk-PIN'] = pin;
+            }
+
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                localStorage.removeItem('desk_security_pin');
+                updateLockUI();
+                return new Promise((resolve) => {
+                    openAuthModal(async () => {
+                        const retryRes = await secureFetch(url, options);
+                        resolve(retryRes);
+                    });
+                });
+            }
+            return res;
+        }
 
         const AVAILABLE_EVENTS = [
             { id: "GOAL", label: "⚽ Goals" },
@@ -544,6 +693,7 @@ DASHBOARD_HTML = """
         };
 
         async function init() {
+            updateLockUI();
             await loadCoverageSettings();
             await fetchNightShiftStatus();
             await fetchMatches();
@@ -620,14 +770,16 @@ DASHBOARD_HTML = """
             };
 
             try {
-                const res = await fetch('/api/settings/coverage', {
+                const res = await secureFetch('/api/settings/coverage', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                coverageConfig = await res.json();
-                closeSettingsModal();
-                showToast("✓ Coverage settings saved!");
+                if (res.ok) {
+                    coverageConfig = await res.json();
+                    closeSettingsModal();
+                    showToast("✓ Coverage settings saved!");
+                }
             } catch (err) {
                 console.error(err);
             }
@@ -669,11 +821,17 @@ DASHBOARD_HTML = """
 
         async function toggleNightShift() {
             if (nightShiftActive) {
-                await fetch('/api/nightshift/stop', { method: 'POST' });
-                nightShiftActive = false;
+                const res = await secureFetch('/api/nightshift/stop', { method: 'POST' });
+                if (res.ok) {
+                    nightShiftActive = false;
+                    showToast("☀️ Remote Desk Disarmed");
+                }
             } else {
-                await fetch('/api/nightshift/start', { method: 'POST' });
-                nightShiftActive = true;
+                const res = await secureFetch('/api/nightshift/start', { method: 'POST' });
+                if (res.ok) {
+                    nightShiftActive = true;
+                    showToast("📡 Remote Desk Armed!");
+                }
             }
             updateNightShiftUI();
             await fetchMatches();
@@ -936,7 +1094,7 @@ DASHBOARD_HTML = """
         }
 
         async function updateMatchConfig(matchId, tracked, coverage, lang) {
-            await fetch('/api/matches/configure', {
+            const res = await secureFetch('/api/matches/configure', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -947,7 +1105,9 @@ DASHBOARD_HTML = """
                     language: lang
                 })
             });
-            await fetchMatches();
+            if (res && res.ok) {
+                await fetchMatches();
+            }
         }
 
         async function toggleMatchTracking(matchId, shouldTrack) {
@@ -956,7 +1116,7 @@ DASHBOARD_HTML = """
             const coverage = covEl ? covEl.value : 'STANDARD';
             const lang = langEl ? langEl.value : 'bn';
 
-            await fetch('/api/matches/configure', {
+            const res = await secureFetch('/api/matches/configure', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -967,7 +1127,9 @@ DASHBOARD_HTML = """
                     language: lang
                 })
             });
-            await fetchMatches();
+            if (res && res.ok) {
+                await fetchMatches();
+            }
         }
 
         // ================= Force Sync Buttons for Ticker & Post Section =================
@@ -975,10 +1137,12 @@ DASHBOARD_HTML = """
             const btn = document.getElementById('sync-ticker-btn');
             btn.innerHTML = '<span>⏳</span> <span>Syncing...</span>';
             try {
-                const res = await fetch('/api/monitor/poll-now', { method: 'POST' });
-                const data = await res.json();
-                showToast(`✓ Pitch ticker synced! (${data.total_events_count} events total)`);
-                await fetchMatches();
+                const res = await secureFetch('/api/monitor/poll-now', { method: 'POST' });
+                if (res && res.ok) {
+                    const data = await res.json();
+                    showToast(`✓ Pitch ticker synced! (${data.total_events_count} events total)`);
+                    await fetchMatches();
+                }
             } catch (err) {
                 console.error(err);
             }
@@ -989,10 +1153,12 @@ DASHBOARD_HTML = """
             const btn = document.getElementById('sync-posts-btn');
             btn.innerHTML = '<span>⏳</span> <span>Syncing...</span>';
             try {
-                const res = await fetch('/api/monitor/poll-now', { method: 'POST' });
-                const data = await res.json();
-                await fetchPosts();
-                showToast(`✓ Post queue refreshed! (${data.total_posts_count} posts)`);
+                const res = await secureFetch('/api/monitor/poll-now', { method: 'POST' });
+                if (res && res.ok) {
+                    const data = await res.json();
+                    await fetchPosts();
+                    showToast(`✓ Post queue refreshed! (${data.total_posts_count} posts)`);
+                }
             } catch (err) {
                 console.error(err);
             }
@@ -1086,15 +1252,17 @@ DASHBOARD_HTML = """
 
         async function approvePost(postId, status) {
             const content = document.getElementById(`content-${postId}`).value;
-            await fetch(`/api/posts/${postId}`, {
+            const res = await secureFetch(`/api/posts/${postId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: status, content: content })
             });
-            if (status === 'PUBLISHED') {
-                showToast("✓ Post published to Telegram channel!");
+            if (res && res.ok) {
+                if (status === 'PUBLISHED') {
+                    showToast("✓ Post published to Telegram channel!");
+                }
+                await fetchPosts();
             }
-            await fetchPosts();
         }
 
         async function publishAllPendingPosts() {
@@ -1108,17 +1276,21 @@ DASHBOARD_HTML = """
                 if (queued.length === 0) {
                     showToast("All posts are already published.");
                 } else {
+                    let successCount = 0;
                     for (const p of queued) {
                         const contentEl = document.getElementById(`content-${p.post_id}`);
                         const content = contentEl ? contentEl.value : p.content;
-                        await fetch(`/api/posts/${p.post_id}`, {
+                        const patchRes = await secureFetch(`/api/posts/${p.post_id}`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ status: 'PUBLISHED', content: content })
                         });
+                        if (patchRes && patchRes.ok) successCount++;
                     }
-                    showToast(`✓ Dispatched ${queued.length} posts to Telegram!`);
-                    await fetchPosts();
+                    if (successCount > 0) {
+                        showToast(`✓ Dispatched ${successCount} posts to Telegram!`);
+                        await fetchPosts();
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -1468,7 +1640,7 @@ DASHBOARD_HTML = """
             const covEl = document.getElementById(`cal-cov-${matchId}`);
             const coverage = covEl ? covEl.value : 'STANDARD';
 
-            await fetch('/api/matches/configure', {
+            const res = await secureFetch('/api/matches/configure', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1480,9 +1652,11 @@ DASHBOARD_HTML = """
                 })
             });
 
-            showToast(shouldTrack ? "✓ Fixture pre-scheduled for Remote Desk!" : "✕ Fixture removed from Remote Desk");
-            await fetchMatches();
-            await fetchCalendarMatches();
+            if (res && res.ok) {
+                showToast(shouldTrack ? "✓ Fixture pre-scheduled for Remote Desk!" : "✕ Fixture removed from Remote Desk");
+                await fetchMatches();
+                await fetchCalendarMatches();
+            }
         }
 
         // ================= Social Graphics Modal Logic =================

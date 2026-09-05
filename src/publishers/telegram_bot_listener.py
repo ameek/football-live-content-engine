@@ -27,10 +27,17 @@ class TelegramBotListener:
         self._running = False
         self._task: Optional[asyncio.Task] = None
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.authorized_chat_ids: set = set()
 
     @property
     def is_configured(self) -> bool:
         return bool(self.bot_token)
+
+    def get_expected_pin(self) -> str:
+        return os.getenv("DESK_SECURITY_PIN") or os.getenv("FOOTBALL_DESK_SECURITY_PIN") or "2026"
+
+    def is_authorized(self, chat_id: int, user_id: Optional[int] = None) -> bool:
+        return (chat_id in self.authorized_chat_ids) or (user_id and user_id in self.authorized_chat_ids)
 
     async def start(self):
         """Start background Telegram bot polling loop."""
@@ -93,23 +100,28 @@ class TelegramBotListener:
             await self._handle_callback_query(cb)
 
     async def _handle_command(self, text: str, chat_id: int, msg: Dict[str, Any]):
-        """Handle direct bot commands (/start, /status, /live, /track, /stats, /lineups, /nightshift)."""
+        """Handle direct bot commands (/start, /status, /live, /code, /track, /stats, /lineups, /nightshift)."""
         parts = text.split()
         cmd = parts[0].lower().replace("@football_post_bot", "")
+        from_user = msg.get("from", {})
+        user_id = from_user.get("id")
 
         if cmd == "/start" or cmd.startswith("/start") or cmd in ("/help", "/list", "/commands"):
             help_text = (
                 "⚽ <b>Pavilion Football Remote Desk Controller</b> 📡\n\n"
                 "Welcome to the automated sports newsroom controller bot!\n\n"
-                "<b>Available Commands:</b>\n"
+                "<b>Public Commands:</b>\n"
                 "• <code>/status</code> — Check active monitored matches & night shift state\n"
-                "• <code>/live</code> — List top worldwide live matches with 1-tap track buttons\n"
-                "• <code>/track &lt;match_id&gt;</code> — Arm a match on the remote desk\n"
-                "• <code>/untrack &lt;match_id&gt;</code> — Stop tracking a match\n"
+                "• <code>/live</code> — List top worldwide live matches\n"
                 "• <code>/stats &lt;match_id&gt;</code> — Pull live match statistics snapshot\n"
                 "• <code>/lineups &lt;match_id&gt;</code> — Render Starting XI pitch tactical board\n"
-                "• <code>/report &lt;match_id&gt;</code> — Generate 300-word AI editorial match report\n"
-                "• <code>/nightshift on|off</code> — Toggle autonomous night shift mode\n\n"
+                "• <code>/report &lt;match_id&gt;</code> — Generate 300-word AI editorial match report\n\n"
+                "<b>🔐 Administrative Controls (PIN Protected):</b>\n"
+                "• <code>/code &lt;PIN&gt;</code> — Authenticate session (e.g. <code>/code 2026</code>)\n"
+                "• <code>/track &lt;match_id&gt;</code> — Arm a match on the remote desk\n"
+                "• <code>/untrack &lt;match_id&gt;</code> — Stop tracking a match\n"
+                "• <code>/nightshift on|off</code> — Toggle autonomous night shift mode\n"
+                "• <code>/lock</code> — Lock and de-authenticate current session\n\n"
                 "<i>Use the buttons below for quick actions:</i>"
             )
             keyboard = {
@@ -120,6 +132,25 @@ class TelegramBotListener:
             }
             await self._send_message(chat_id, help_text, keyboard)
 
+        elif cmd in ("/code", "/auth", "/login", "/pin"):
+            if len(parts) < 2:
+                await self._send_message(chat_id, "❌ <b>Usage:</b> <code>/code &lt;PIN&gt;</code> (e.g. <code>/code 2026</code>)")
+                return
+            entered_pin = parts[1].strip()
+            if entered_pin == self.get_expected_pin().strip():
+                self.authorized_chat_ids.add(chat_id)
+                if user_id:
+                    self.authorized_chat_ids.add(user_id)
+                await self._send_message(chat_id, "🔓 <b>Authentication Successful!</b>\n\nYour session is authorized. You can now use <code>/track</code>, <code>/untrack</code>, and <code>/nightshift</code>.")
+            else:
+                await self._send_message(chat_id, "❌ <b>Invalid Security PIN.</b> Access denied.")
+
+        elif cmd in ("/lock", "/logout", "/deauth"):
+            self.authorized_chat_ids.discard(chat_id)
+            if user_id:
+                self.authorized_chat_ids.discard(user_id)
+            await self._send_message(chat_id, "🔒 <b>Desk Session Locked.</b> Administrative controls require <code>/code &lt;PIN&gt;</code>.")
+
         elif cmd == "/status":
             await self._reply_status(chat_id)
 
@@ -127,11 +158,33 @@ class TelegramBotListener:
             await self._reply_live_matches(chat_id)
 
         elif cmd == "/track":
+            # Check security authorization
+            is_authed = self.is_authorized(chat_id, user_id)
+            if not is_authed and len(parts) > 2 and parts[-1].strip() == self.get_expected_pin().strip():
+                is_authed = True
+                parts.pop()
+
+            if not is_authed:
+                await self._send_message(
+                    chat_id,
+                    "🔒 <b>Security Verification Required</b>\n\n"
+                    "Tracking roster modifications are locked. Authenticate first:\n\n"
+                    "👉 <code>/code &lt;PIN&gt;</code>\n"
+                    "<i>Or use:</i> <code>/track &lt;match_id&gt; &lt;PIN&gt;</code>"
+                )
+                return
+
             if len(parts) < 2:
-                await self._send_message(chat_id, "❌ Usage: <code>/track &lt;match_id&gt;</code> (e.g. <code>/track 15526264</code>)")
+                await self._send_message(chat_id, "❌ Usage: <code>/track &lt;match_id&gt;</code> (e.g. <code>/track sched_101</code>)")
                 return
             m_id = parts[1]
             match = await self.monitor.provider.get_match_by_id(m_id)
+            if not match:
+                scheduled = await self.monitor.provider.get_scheduled_matches()
+                for s in scheduled:
+                    if s.id == m_id:
+                        match = s
+                        break
             if not match:
                 await self._send_message(chat_id, f"❌ Match <code>{m_id}</code> not found.")
                 return
@@ -139,6 +192,22 @@ class TelegramBotListener:
             await self._send_message(chat_id, f"✅ <b>Armed Match:</b> {match.home_team.name} vs {match.away_team.name} (ID: {m_id})")
 
         elif cmd == "/untrack":
+            # Check security authorization
+            is_authed = self.is_authorized(chat_id, user_id)
+            if not is_authed and len(parts) > 2 and parts[-1].strip() == self.get_expected_pin().strip():
+                is_authed = True
+                parts.pop()
+
+            if not is_authed:
+                await self._send_message(
+                    chat_id,
+                    "🔒 <b>Security Verification Required</b>\n\n"
+                    "Untracking matches is locked. Authenticate first:\n\n"
+                    "👉 <code>/code &lt;PIN&gt;</code>\n"
+                    "<i>Or use:</i> <code>/untrack &lt;match_id&gt; &lt;PIN&gt;</code>"
+                )
+                return
+
             if len(parts) < 2:
                 await self._send_message(chat_id, "❌ Usage: <code>/untrack &lt;match_id&gt;</code>")
                 return
@@ -147,6 +216,22 @@ class TelegramBotListener:
             await self._send_message(chat_id, f"✅ Removed match <code>{m_id}</code> from monitor roster.")
 
         elif cmd == "/nightshift":
+            # Check security authorization
+            is_authed = self.is_authorized(chat_id, user_id)
+            if not is_authed and len(parts) > 2 and parts[-1].strip() == self.get_expected_pin().strip():
+                is_authed = True
+                parts.pop()
+
+            if not is_authed:
+                await self._send_message(
+                    chat_id,
+                    "🔒 <b>Security Verification Required</b>\n\n"
+                    "Night Shift controls are locked. Authenticate first:\n\n"
+                    "👉 <code>/code &lt;PIN&gt;</code>\n"
+                    "<i>Or use:</i> <code>/nightshift on &lt;PIN&gt;</code>"
+                )
+                return
+
             action = parts[1].lower() if len(parts) > 1 else ("off" if self.monitor.night_shift.active else "on")
             if action == "on":
                 self.monitor.start_night_shift()
@@ -183,6 +268,8 @@ class TelegramBotListener:
         msg = cb.get("message", {})
         chat_id = msg.get("chat", {}).get("id")
         message_id = msg.get("message_id")
+        from_user = cb.get("from", {})
+        user_id = from_user.get("id")
 
         await self._answer_callback(cb_id)
 
@@ -191,6 +278,10 @@ class TelegramBotListener:
         elif data == "cmd_live":
             await self._reply_live_matches(chat_id)
         elif data == "cmd_nightshift":
+            if not self.is_authorized(chat_id, user_id):
+                await self._send_message(chat_id, "🔒 <b>Action Denied:</b> Night Shift toggle requires authentication. Send <code>/code &lt;PIN&gt;</code> first.")
+                return
+
             if self.monitor.night_shift.active:
                 self.monitor.stop_night_shift()
                 await self._send_message(chat_id, "☀️ Night Shift turned OFF.")
@@ -203,8 +294,18 @@ class TelegramBotListener:
             await self._reply_ai_match_report(chat_id, m_id)
 
         elif data.startswith("track:"):
+            if not self.is_authorized(chat_id, user_id):
+                await self._send_message(chat_id, "🔒 <b>Action Denied:</b> Adding matches to tracking requires authentication. Send <code>/code &lt;PIN&gt;</code> first.")
+                return
+
             m_id = data.split("track:")[-1]
             match = await self.monitor.provider.get_match_by_id(m_id)
+            if not match:
+                scheduled = await self.monitor.provider.get_scheduled_matches()
+                for s in scheduled:
+                    if s.id == m_id:
+                        match = s
+                        break
             if match:
                 self.monitor.add_match(match, coverage=CoverageProfile.STANDARD, auto_generate=True, auto_publish=True, lang=Language.BANGLA)
                 await self._send_message(chat_id, f"✅ <b>Tracking Started:</b> {match.home_team.name} vs {match.away_team.name}")

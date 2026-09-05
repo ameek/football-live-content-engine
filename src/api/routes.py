@@ -1,8 +1,10 @@
+import os
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta, timezone
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header, Query, status
 from pydantic import BaseModel
 
+from src.config import settings
 from src.domain.models import (
     Match, GeneratedPost, PostStatus, CoverageProfile,
     Language, NewsVoiceStyle, NightShiftConfig, MatchStatus
@@ -13,6 +15,45 @@ from src.engine.importance_engine import CoverageSettings, global_coverage_setti
 from src.engine.post_generator import PostGenerator
 
 router = APIRouter()
+
+
+def get_expected_pin() -> str:
+    return os.getenv("DESK_SECURITY_PIN") or os.getenv("FOOTBALL_DESK_SECURITY_PIN") or getattr(settings, "desk_security_pin", "2026") or "2026"
+
+
+async def verify_desk_security(
+    x_desk_pin: Optional[str] = Header(None, alias="X-Desk-PIN"),
+    authorization: Optional[str] = Header(None),
+    pin: Optional[str] = Query(None)
+):
+    """Enforce PIN-based security layer across all mutating desk actions."""
+    expected_pin = get_expected_pin()
+    provided_pin = x_desk_pin or pin
+    if not provided_pin and authorization:
+        if authorization.startswith("Bearer "):
+            provided_pin = authorization[7:].strip()
+        else:
+            provided_pin = authorization.strip()
+
+    if not provided_pin or provided_pin.strip() != expected_pin.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Valid Desk Security PIN required to modify roster, night-shift, or settings."
+        )
+    return True
+
+
+class VerifyPinRequest(BaseModel):
+    pin: str
+
+
+@router.post("/auth/verify")
+async def verify_security_pin(req: VerifyPinRequest):
+    """Verify security PIN and confirm administrative authorization."""
+    expected_pin = get_expected_pin()
+    if req.pin.strip() == expected_pin.strip():
+        return {"valid": True, "message": "Authentication successful"}
+    raise HTTPException(status_code=401, detail="Invalid Security PIN")
 
 
 class ConfigureMatchRequest(BaseModel):
@@ -113,7 +154,7 @@ async def get_active_leagues(monitor: MatchMonitor = Depends(get_monitor)):
     return ["All"] + leagues
 
 
-@router.post("/matches/configure")
+@router.post("/matches/configure", dependencies=[Depends(verify_desk_security)])
 async def configure_match(req: ConfigureMatchRequest, monitor: MatchMonitor = Depends(get_monitor)):
     """Explicitly toggle tracking and coverage profile for a specific match."""
     import asyncio
@@ -151,7 +192,7 @@ async def configure_match(req: ConfigureMatchRequest, monitor: MatchMonitor = De
     return {"status": "tracked", "match": tracked_match}
 
 
-@router.post("/monitor/poll-now")
+@router.post("/monitor/poll-now", dependencies=[Depends(verify_desk_security)])
 async def force_poll_now(monitor: MatchMonitor = Depends(get_monitor)):
     """Force an immediate polling tick of all tracked matches."""
     new_posts = await monitor.poll_once()
@@ -164,7 +205,7 @@ async def force_poll_now(monitor: MatchMonitor = Depends(get_monitor)):
     }
 
 
-@router.post("/nightshift/start")
+@router.post("/nightshift/start", dependencies=[Depends(verify_desk_security)])
 async def start_night_shift(monitor: MatchMonitor = Depends(get_monitor)):
     """Arm the overnight autonomous monitoring session."""
     import asyncio
@@ -180,7 +221,7 @@ async def start_night_shift(monitor: MatchMonitor = Depends(get_monitor)):
     return {"status": "night_shift_armed", "config": monitor.night_shift}
 
 
-@router.post("/nightshift/stop")
+@router.post("/nightshift/stop", dependencies=[Depends(verify_desk_security)])
 async def stop_night_shift(monitor: MatchMonitor = Depends(get_monitor)):
     """Disarm overnight night-shift monitoring."""
     import asyncio
@@ -204,7 +245,7 @@ async def get_coverage_settings():
     return global_coverage_settings
 
 
-@router.post("/settings/coverage", response_model=CoverageSettings)
+@router.post("/settings/coverage", response_model=CoverageSettings, dependencies=[Depends(verify_desk_security)])
 async def save_coverage_settings(settings: CoverageSettings):
     """Update custom event triggers for Full, Standard, and Result Only coverage levels."""
     global global_coverage_settings
@@ -240,7 +281,7 @@ async def get_telegram_settings(monitor: MatchMonitor = Depends(get_monitor)):
     }
 
 
-@router.post("/settings/telegram")
+@router.post("/settings/telegram", dependencies=[Depends(verify_desk_security)])
 async def save_telegram_settings(req: TelegramConfigRequest, monitor: MatchMonitor = Depends(get_monitor)):
     """Save or update Telegram bot credentials."""
     if req.bot_token:
@@ -254,7 +295,7 @@ async def save_telegram_settings(req: TelegramConfigRequest, monitor: MatchMonit
     }
 
 
-@router.post("/settings/telegram/test")
+@router.post("/settings/telegram/test", dependencies=[Depends(verify_desk_security)])
 async def test_telegram_connection(monitor: MatchMonitor = Depends(get_monitor)):
     """Test Telegram bot connection and channel posting."""
     return await monitor.telegram_publisher.test_connection()
@@ -270,7 +311,7 @@ async def telegram_webhook(req_body: Dict[str, Any]):
 
 
 @router.get("/telegram/set-webhook")
-@router.post("/telegram/set-webhook")
+@router.post("/telegram/set-webhook", dependencies=[Depends(verify_desk_security)])
 async def set_telegram_webhook(webhook_url: str, monitor: MatchMonitor = Depends(get_monitor)):
     """Configure Telegram to deliver real-time bot updates to this Vercel Serverless URL."""
     import httpx
@@ -295,7 +336,7 @@ async def vercel_cron_poll(monitor: MatchMonitor = Depends(get_monitor)):
     }
 
 
-@router.patch("/posts/{post_id}")
+@router.patch("/posts/{post_id}", dependencies=[Depends(verify_desk_security)])
 async def update_post(post_id: str, req: UpdatePostRequest, monitor: MatchMonitor = Depends(get_monitor)):
     """Edit, Approve, Reject, or Publish a generated post."""
     for post in monitor.generated_posts:
