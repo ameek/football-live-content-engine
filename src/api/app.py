@@ -550,6 +550,16 @@ DASHBOARD_HTML = """
             await fetchPosts();
             setupWebSocket();
 
+            // Resilient auto-sync ticker & post queue for Vercel / serverless deployments
+            setInterval(async () => {
+                try {
+                    await fetchMatches();
+                    await fetchPosts();
+                } catch (e) {
+                    console.error('Auto-sync error:', e);
+                }
+            }, 10000);
+
             document.addEventListener('click', (e) => {
                 const liveDrop = document.getElementById('custom-league-dropdown-container');
                 const calDrop = document.getElementById('custom-calendar-league-dropdown-container');
