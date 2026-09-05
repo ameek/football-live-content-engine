@@ -1,7 +1,7 @@
 import uuid
 import logging
 import urllib.parse
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any, Tuple
 import httpx
 
 from src.domain.events import DomainEvent, DomainEventType
