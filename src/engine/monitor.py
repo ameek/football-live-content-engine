@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 
@@ -49,6 +51,60 @@ class MatchMonitor:
         self._running = False
         self._task: Optional[asyncio.Task] = None
 
+        # Load persisted desk state on cold start
+        self._load_persisted_state()
+
+    def _get_state_file_paths(self) -> List[Path]:
+        paths = []
+        paths.append(Path("/tmp/desk_state.json"))
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        paths.append(base_dir / "data" / "desk_state.json")
+        return paths
+
+    def _load_persisted_state(self):
+        """Restore active monitored matches and Night Shift config across serverless cold starts."""
+        for path in self._get_state_file_paths():
+            if path.exists():
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+
+                    if "night_shift" in data and isinstance(data["night_shift"], dict):
+                        self.night_shift = NightShiftConfig.model_validate(data["night_shift"])
+
+                    if "tracked_matches" in data and isinstance(data["tracked_matches"], dict):
+                        for match_id, m_dict in data["tracked_matches"].items():
+                            self.monitored_matches[match_id] = Match.model_validate(m_dict)
+
+                    logger.info(f"Loaded persistent desk state from {path} with {len(self.monitored_matches)} tracked matches (Night Shift active: {self.night_shift.active}).")
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to load desk state from {path}: {e}")
+
+    def _save_persisted_state(self):
+        """Persist monitored matches and Night Shift status to disk."""
+        try:
+            state_dict = {
+                "night_shift": self.night_shift.model_dump(mode="json"),
+                "tracked_matches": {
+                    mid: m.model_dump(mode="json") for mid, m in self.monitored_matches.items()
+                }
+            }
+            tmp_path = Path("/tmp/desk_state.json")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(state_dict, f, indent=2, ensure_ascii=False)
+
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            data_path = base_dir / "data" / "desk_state.json"
+            try:
+                data_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(data_path, "w", encoding="utf-8") as f:
+                    json.dump(state_dict, f, indent=2, ensure_ascii=False)
+            except OSError:
+                pass  # Ignore read-only errors on serverless environments
+        except Exception as e:
+            logger.error(f"Failed to persist desk state: {e}")
+
     def add_match(
         self,
         match: Match,
@@ -65,6 +121,7 @@ class MatchMonitor:
         self.monitored_matches[match.id] = match
         if match.id not in self.night_shift.active_match_ids:
             self.night_shift.active_match_ids.append(match.id)
+        self._save_persisted_state()
         logger.info(f"🌙 [Monitor Session] Added '{match.home_team.name} vs {match.away_team.name}' (Coverage: {coverage.value}, AutoPub: {auto_publish})")
 
     def remove_match(self, match_id: str):
@@ -73,6 +130,7 @@ class MatchMonitor:
             del self.monitored_matches[match_id]
         if match_id in self.night_shift.active_match_ids:
             self.night_shift.active_match_ids.remove(match_id)
+        self._save_persisted_state()
         logger.info(f"Removed match {match_id} from monitor list.")
 
     def start_night_shift(self, default_coverage: CoverageProfile = CoverageProfile.STANDARD, auto_publish: bool = False):
@@ -81,11 +139,13 @@ class MatchMonitor:
         self.night_shift.started_at = datetime.now(timezone.utc)
         self.night_shift.default_coverage = default_coverage
         self.night_shift.default_auto_publish = auto_publish
+        self._save_persisted_state()
         logger.info("🌙 [Night Shift ACTIVATED] Overnight automated newsroom desk is now running.")
 
     def stop_night_shift(self):
         """Stop Night Shift mode."""
         self.night_shift.active = False
+        self._save_persisted_state()
         logger.info("🌙 [Night Shift DEACTIVATED].")
 
     async def start(self):

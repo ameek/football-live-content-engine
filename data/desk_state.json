@@ -1,0 +1,142 @@
+{
+  "night_shift": {
+    "active": true,
+    "default_language": "bn",
+    "default_coverage": "STANDARD",
+    "default_auto_publish": true,
+    "active_match_ids": ["sched_101", "sched_102", "sched_103", "sched_104", "sched_105"],
+    "started_at": "2026-09-05T00:00:00Z"
+  },
+  "tracked_matches": {
+    "sched_101": {
+      "id": "sched_101",
+      "tournament_name": "Premier League",
+      "tournament_category": "England",
+      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+      "home_team": {
+        "id": "17",
+        "name": "Manchester City",
+        "logo_url": "https://api.sofascore.app/api/v1/team/17/image"
+      },
+      "away_team": {
+        "id": "44",
+        "name": "Liverpool",
+        "logo_url": "https://api.sofascore.app/api/v1/team/44/image"
+      },
+      "status": "NOT_STARTED",
+      "status_detail": "22:00 Tonight",
+      "minute": null,
+      "score": {"home": 0, "away": 0},
+      "coverage": "STANDARD",
+      "auto_generate": true,
+      "auto_publish": true,
+      "language": "bn",
+      "voice_style": "BREAKING",
+      "incident_ids_seen": []
+    },
+    "sched_102": {
+      "id": "sched_102",
+      "tournament_name": "LaLiga",
+      "tournament_category": "Spain",
+      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
+      "home_team": {
+        "id": "2817",
+        "name": "Real Madrid",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2817/image"
+      },
+      "away_team": {
+        "id": "2818",
+        "name": "Barcelona",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2818/image"
+      },
+      "status": "NOT_STARTED",
+      "status_detail": "23:30 Tonight",
+      "minute": null,
+      "score": {"home": 0, "away": 0},
+      "coverage": "STANDARD",
+      "auto_generate": true,
+      "auto_publish": true,
+      "language": "bn",
+      "voice_style": "BREAKING",
+      "incident_ids_seen": []
+    },
+    "sched_103": {
+      "id": "sched_103",
+      "tournament_name": "Serie A",
+      "tournament_category": "Italy",
+      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
+      "home_team": {
+        "id": "2697",
+        "name": "Inter Milan",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2697/image"
+      },
+      "away_team": {
+        "id": "2687",
+        "name": "Juventus",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2687/image"
+      },
+      "status": "NOT_STARTED",
+      "status_detail": "21:45 Tonight",
+      "minute": null,
+      "score": {"home": 0, "away": 0},
+      "coverage": "STANDARD",
+      "auto_generate": true,
+      "auto_publish": true,
+      "language": "bn",
+      "voice_style": "BREAKING",
+      "incident_ids_seen": []
+    },
+    "sched_104": {
+      "id": "sched_104",
+      "tournament_name": "Bundesliga",
+      "tournament_category": "Germany",
+      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
+      "home_team": {
+        "id": "2672",
+        "name": "Bayern München",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2672/image"
+      },
+      "away_team": {
+        "id": "2673",
+        "name": "Borussia Dortmund",
+        "logo_url": "https://api.sofascore.app/api/v1/team/2673/image"
+      },
+      "status": "NOT_STARTED",
+      "status_detail": "20:30 Tonight",
+      "minute": null,
+      "score": {"home": 0, "away": 0},
+      "coverage": "STANDARD",
+      "auto_generate": true,
+      "auto_publish": true,
+      "language": "bn",
+      "voice_style": "BREAKING",
+      "incident_ids_seen": []
+    },
+    "sched_105": {
+      "id": "sched_105",
+      "tournament_name": "UEFA Champions League",
+      "tournament_category": "Europe",
+      "tournament_logo_url": "https://api.sofascore.app/api/v1/unique-tournament/7/image",
+      "home_team": {
+        "id": "42",
+        "name": "Arsenal",
+        "logo_url": "https://api.sofascore.app/api/v1/team/42/image"
+      },
+      "away_team": {
+        "id": "1644",
+        "name": "Paris Saint-Germain",
+        "logo_url": "https://api.sofascore.app/api/v1/team/1644/image"
+      },
+      "status": "NOT_STARTED",
+      "status_detail": "23:00 Tonight",
+      "minute": null,
+      "score": {"home": 0, "away": 0},
+      "coverage": "STANDARD",
+      "auto_generate": true,
+      "auto_publish": true,
+      "language": "bn",
+      "voice_style": "BREAKING",
+      "incident_ids_seen": []
+    }
+  }
+}

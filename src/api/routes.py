@@ -38,7 +38,7 @@ def get_monitor() -> MatchMonitor:
 
 @router.get("/matches/live", response_model=List[Match])
 async def get_live_matches(league: Optional[str] = None, monitor: MatchMonitor = Depends(get_monitor)):
-    """Retrieve all live matches worldwide."""
+    """Retrieve all live matches worldwide, including any actively monitored fixtures."""
     matches = await monitor.provider.get_live_matches()
 
     for m in matches:
@@ -52,6 +52,12 @@ async def get_live_matches(league: Optional[str] = None, monitor: MatchMonitor =
         else:
             m.auto_generate = False
             m.auto_publish = False
+
+    # Also include monitored matches that might not be in live feed yet so they appear in live monitor if active
+    existing_ids = {m.id for m in matches}
+    for m_id, monitored_m in monitor.monitored_matches.items():
+        if m_id not in existing_ids:
+            matches.append(monitored_m)
 
     if league and league != "All":
         matches = [m for m in matches if league.lower() in m.tournament_name.lower()]
@@ -75,6 +81,7 @@ async def get_scheduled_matches(date_str: Optional[str] = None, league: Optional
             m.coverage = tracked.coverage
             m.auto_publish = tracked.auto_publish
             m.language = tracked.language
+            m.voice_style = tracked.voice_style
         else:
             m.auto_generate = False
             m.auto_publish = False

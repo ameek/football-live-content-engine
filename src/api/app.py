@@ -518,6 +518,7 @@ DASHBOARD_HTML = """
         let calendarLeague = "All";
         let currentCalendarDate = "today";
         let nightShiftActive = false;
+        let nightShiftActiveMatchIds = [];
 
         const AVAILABLE_EVENTS = [
             { id: "GOAL", label: "⚽ Goals" },
@@ -637,6 +638,7 @@ DASHBOARD_HTML = """
                 const res = await fetch('/api/nightshift/status');
                 const data = await res.json();
                 nightShiftActive = data.active;
+                nightShiftActiveMatchIds = data.active_match_ids || [];
                 updateNightShiftUI();
             } catch (e) {
                 console.error(e);
@@ -647,13 +649,17 @@ DASHBOARD_HTML = """
             const btn = document.getElementById('nightshift-btn');
             const txt = document.getElementById('nightshift-text');
             const banner = document.getElementById('nightshift-banner');
-            const trackedCount = allMatches.filter(m => m.auto_generate).length;
+            
+            const liveTracked = allMatches.filter(m => m.auto_generate).length;
+            const calTracked = calendarMatches.filter(m => m.auto_generate).length;
+            const trackedCount = Math.max(liveTracked, calTracked, nightShiftActiveMatchIds.length);
 
             if (nightShiftActive) {
                 btn.className = "px-5 py-2 rounded-xl text-xs font-bold tracking-wide shadow-lg transition-all duration-200 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25 border border-emerald-400/30";
                 txt.innerText = "REMOTE DESK ARMED 📡";
                 banner.classList.remove('hidden');
-                document.getElementById('roster-count').innerText = trackedCount;
+                const rosterCountEl = document.getElementById('roster-count');
+                if (rosterCountEl) rosterCountEl.innerText = trackedCount;
             } else {
                 btn.className = "px-5 py-2 rounded-xl text-xs font-bold tracking-wide shadow-lg transition-all duration-200 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25 border border-indigo-400/30";
                 txt.innerText = "START REMOTE DESK";
@@ -1129,6 +1135,7 @@ DASHBOARD_HTML = """
                 calendarMatches = await res.json();
                 populateCalendarLeagues(calendarMatches);
                 filterCalendarMatches();
+                updateNightShiftUI();
             } catch (e) {
                 console.error(e);
             }
