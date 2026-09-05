@@ -1,0 +1,28 @@
+{
+  "tones": {
+    "BREAKING_GOAL": {
+      "headline_prefix": "🚨 ⚽️ গোওওল!",
+      "energy_level": "VERY_HIGH",
+      "pacing": "FAST_PACED",
+      "focus": "Hero player, minute, assist provider, scoreline impact"
+    },
+    "COMEBACK_THRILLER": {
+      "headline_prefix": "🔥 রোমাঞ্চকর প্রত্যাবর্তন!",
+      "energy_level": "EXTREME",
+      "pacing": "DRAMATIC",
+      "focus": "Resilience, turnaround, stadium atmosphere"
+    },
+    "TACTICAL_BREAKDOWN": {
+      "headline_prefix": "🧠 ট্যাকটিকাল লড়াই!",
+      "energy_level": "ANALYTICAL",
+      "pacing": "MEASURED",
+      "focus": "Space exploitation, pressing triggers, substitution impact"
+    },
+    "FULL_TIME_REPORT": {
+      "headline_prefix": "⏱️ পূর্ণাঙ্গ ম্যাচ রিপোর্ট:",
+      "energy_level": "AUTHORITATIVE",
+      "pacing": "JOURNALISTIC_LONGFORM",
+      "focus": "Complete 90-minute narrative, turning point, league table standing"
+    }
+  }
+}

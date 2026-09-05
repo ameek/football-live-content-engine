@@ -1,0 +1,39 @@
+{
+  "media_outlet": "Pavilion (প্যাভিলিয়ন)",
+  "editorial_desk": "প্যাভিলিয়ন স্পোর্টস ডেস্ক 🇧🇩",
+  "transliterations": {
+    "tournaments": {
+      "Premier League": "ইংলিশ প্রিমিয়ার লিগ",
+      "LaLiga": "লা লিগা",
+      "UEFA Champions League": "উয়েফা চ্যাম্পিয়নস লিগ",
+      "Serie A": "সিরি আ",
+      "Bundesliga": "বুন্দেসলিগা",
+      "Ligue 1": "লিগ ওয়ান",
+      "FIFA World Cup": "ফিফা বিশ্বকাপ",
+      "Copa America": "কোপা আমেরিকা",
+      "UEFA European Championship": "ইউরো চ্যাম্পিয়নশিপ",
+      "FA Cup": "এফএ কাপ"
+    },
+    "club_nicknames": {
+      "Real Madrid": "লস ব্লাঙ্কোস",
+      "Barcelona": "কাতালান জায়ান্টস / ব্লাউগ্রানা",
+      "Arsenal": "গানার্স",
+      "Chelsea": "ব্লুজ",
+      "Liverpool": "অল রেডস",
+      "Manchester City": "সিটিজেনস",
+      "Manchester United": "রেড ডেভিলস",
+      "Bayern Munich": "বাভারিয়ান জায়ান্টস",
+      "Juventus": "তুরিনের ওল্ড লেডি",
+      "Inter Milan": "নেরাজ্জুরি",
+      "AC Milan": "রোসোনেরি",
+      "Paris Saint-Germain": "লা পারিসিয়ান"
+    },
+    "match_situations": {
+      "El Clásico": "এল ক্লাসিকো",
+      "Manchester Derby": "ম্যানচেস্টার ডার্বি",
+      "North London Derby": "উত্তর লন্ডন ডার্বি",
+      "Derby della Madonnina": "মিলান ডার্বি",
+      "Der Klassiker": "ডার ক্লাসিকের"
+    }
+  }
+}

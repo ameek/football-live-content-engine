@@ -3,10 +3,12 @@ import json
 import logging
 from typing import Optional, Dict, Any, List
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # Prioritize 500 Requests-Per-Day tier (Gemini 3.5 Flash Lite) to maximize free usage
 MODELS_TO_TRY = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
 
@@ -19,7 +21,11 @@ class GeminiEnricher:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+        self._api_key = api_key
+
+    @property
+    def api_key(self) -> str:
+        return self._api_key or os.getenv("GEMINI_API_KEY", "")
 
     @property
     def is_available(self) -> bool:
@@ -84,11 +90,13 @@ class GeminiEnricher:
         if not self.is_available:
             return None
 
+        from src.engine.pavilion_knowledge_graph import global_pavilion_kg
         target_lang = "Bengali (বাংলা)" if lang == "bn" else "English"
+        kg_instructions = global_pavilion_kg.get_system_prompt_instruction()
+
         prompt = (
-            f"You are a Senior Football Journalist at a top sports desk (Pavilion Sports).\n"
-            f"Write a sports news update in {target_lang}.\n\n"
-            f"Match Event Details:\n"
+            f"{kg_instructions}\n\n"
+            f"Match Event Context:\n"
             f"- Event: {event_type}\n"
             f"- Match: {team_name} vs {opponent_name}\n"
             f"- Minute: {minute}'\n"
@@ -98,8 +106,8 @@ class GeminiEnricher:
             f"- Scoreline Momentum Context: {momentum_phrase}\n"
             f"- Tactical/Commentary snippet: {tactical_desc or 'N/A'}\n\n"
             f"Requirements:\n"
-            f"1. Headline: 10-15 words max, exciting and punchy with breaking sports emojis.\n"
-            f"2. Lead Narrative: 2-3 engaging sentences describing the goal/incident with authentic football emotion and tactical flair.\n"
+            f"1. Headline: 10-15 words max, exciting, punchy, mimicking Pavilion Sports style with breaking emojis.\n"
+            f"2. Lead Narrative: 2-3 engaging sentences describing the goal/incident with authentic Bengali sports idioms and tactical flair.\n"
             f"3. Return ONLY valid JSON with keys \"headline\" and \"lead_paragraph\" without markdown code blocks:\n"
             f'{{"headline": "...", "lead_paragraph": "..."}}'
         )
@@ -133,21 +141,25 @@ class GeminiEnricher:
         if not self.is_available:
             return None
 
+        from src.engine.pavilion_knowledge_graph import global_pavilion_kg
         events_text = "\n".join(f"- {e}" for e in events_summary) if events_summary else "No major incidents recorded."
         target_lang = "Bengali (বাংলা)" if lang == "bn" else "English"
+        kg_instructions = global_pavilion_kg.get_system_prompt_instruction()
+
         prompt = (
-            f"You are a Lead Sports Columnist.\n"
-            f"Write a full post-match editorial report (around 250-350 words) in {target_lang}.\n\n"
+            f"{kg_instructions}\n\n"
+            f"Write a comprehensive post-match editorial report (around 250-350 words) in {target_lang}.\n\n"
             f"Match: {home_team} {score} {away_team}\n"
             f"Tournament: {tournament}\n\n"
             f"Key Incidents:\n{events_text}\n\n"
-            f"Stats: {json.dumps(stats_summary, ensure_ascii=False)}\n\n"
+            f"Stats Overview: {json.dumps(stats_summary, ensure_ascii=False)}\n\n"
             f"Structure:\n"
-            f"1. Engaging Title\n"
-            f"2. Paragraph 1: Match wrap-up & how the game unfolded.\n"
-            f"3. Paragraph 2: Tactical masterclass, turning point, and key standout player.\n"
-            f"4. Paragraph 3: Significance of this result on the tournament table.\n\n"
-            f"Write with journalistic authority and authentic sports terminology."
+            f"1. Headline: Pavilion style catchy Bengali sports headline with match result\n"
+            f"2. Paragraph 1: High-tempo match wrap-up & how the drama unfolded.\n"
+            f"3. Paragraph 2: Tactical battle, turning point, and hero performance.\n"
+            f"4. Paragraph 3: Table standing / championship implications.\n"
+            f"5. Ending sign-off: 'প্যাভিলিয়ন স্পোর্টস ডেস্ক 🇧🇩'\n\n"
+            f"Write with journalistic authority, active football terminology, and authentic Pavilion newsroom tone."
         )
 
         return await self._call_gemini(prompt, timeout=4.5)
