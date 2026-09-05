@@ -88,6 +88,40 @@ class PostGenerator:
             headline, content = self._generate_english(event, match, target_style, tactical_info, all_match_events)
             english_copy = content
 
+        # Optional Google AI Studio (Gemini) Newsroom Enrichment with Zero-Drop Fallback
+        if event.event_type == DomainEventType.GOAL:
+            try:
+                from src.engine.gemini_enricher import global_gemini_enricher
+                if global_gemini_enricher.is_available:
+                    h_team = match.home_team.name
+                    a_team = match.away_team.name
+                    team_name = h_team if event.is_home_team else a_team
+                    opp_name = a_team if event.is_home_team else h_team
+                    ai_res = await global_gemini_enricher.enrich_incident_narrative(
+                        event_type="Goal",
+                        team_name=team_name,
+                        opponent_name=opp_name,
+                        score=f"{event.home_score}-{event.away_score}",
+                        minute=event.minute or 0,
+                        player_name=event.player_name or "Goalscorer",
+                        assist_name=event.secondary_player_name,
+                        momentum_phrase=tactical_info.get("lead_momentum_bn", "") if tactical_info else "",
+                        tactical_desc=tactical_info.get("bangla_tactical", "") if tactical_info else "",
+                        lang="bn" if target_lang == Language.BANGLA else "en"
+                    )
+                    if ai_res:
+                        headline = ai_res.get("headline") or headline
+                        ai_lead = ai_res.get("lead_paragraph")
+                        if ai_lead:
+                            # Replace lead paragraph while preserving statistics and hashtag block
+                            parts = content.split("\n\n", 2)
+                            if len(parts) >= 2:
+                                content = f"{ai_lead}\n\n" + "\n\n".join(parts[2:])
+                            else:
+                                content = f"{ai_lead}\n\n{content}"
+            except Exception as e:
+                logger.debug(f"Gemini enrichment pass skipped: {e}")
+
         hashtags = [
             f"#{match.tournament_name.replace(' ', '')}",
             f"#{match.home_team.name.replace(' ', '')}",

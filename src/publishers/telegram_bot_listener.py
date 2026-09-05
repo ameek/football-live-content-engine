@@ -108,6 +108,7 @@ class TelegramBotListener:
                 "• <code>/untrack &lt;match_id&gt;</code> — Stop tracking a match\n"
                 "• <code>/stats &lt;match_id&gt;</code> — Pull live match statistics snapshot\n"
                 "• <code>/lineups &lt;match_id&gt;</code> — Render Starting XI pitch tactical board\n"
+                "• <code>/report &lt;match_id&gt;</code> — Generate 300-word AI editorial match report\n"
                 "• <code>/nightshift on|off</code> — Toggle autonomous night shift mode\n\n"
                 "<i>Use the buttons below for quick actions:</i>"
             )
@@ -168,6 +169,13 @@ class TelegramBotListener:
                 return
             await self._reply_lineup_graphic(chat_id, m_id)
 
+        elif cmd in ("/report", "/article"):
+            m_id = parts[1] if len(parts) > 1 else (list(self.monitor.monitored_matches.keys())[0] if self.monitor.monitored_matches else None)
+            if not m_id:
+                await self._send_message(chat_id, "❌ Use <code>/report &lt;match_id&gt;</code>")
+                return
+            await self._reply_ai_match_report(chat_id, m_id)
+
     async def _handle_callback_query(self, cb: Dict[str, Any]):
         """Handle inline button clicks."""
         cb_id = cb.get("id")
@@ -189,6 +197,10 @@ class TelegramBotListener:
             else:
                 self.monitor.start_night_shift()
                 await self._send_message(chat_id, "🌙 Night Shift turned ON!")
+
+        elif data.startswith("report:"):
+            m_id = data.split("report:")[-1]
+            await self._reply_ai_match_report(chat_id, m_id)
 
         elif data.startswith("track:"):
             m_id = data.split("track:")[-1]
@@ -400,6 +412,43 @@ class TelegramBotListener:
                 await client.post(url, data=data, files=files)
         except Exception as e:
             logger.debug(f"Error sending bot photo: {e}")
+
+    async def _reply_ai_match_report(self, chat_id: int, match_id: str):
+        """Generate and send full AI editorial match report."""
+        from src.engine.gemini_enricher import global_gemini_enricher
+        match = await self.monitor.provider.get_match_by_id(match_id)
+        if not match:
+            scheduled = await self.monitor.provider.get_scheduled_matches()
+            for s in scheduled:
+                if s.id == match_id:
+                    match = s
+                    break
+        if not match:
+            await self._send_message(chat_id, f"❌ Match <code>{match_id}</code> not found.")
+            return
+
+        events = await self.monitor.provider.get_match_events(match_id)
+        stats = await self.monitor.provider.get_match_statistics(match_id)
+        events_summary = [f"{e.minute}': {e.event_type.value} - {e.player_name or ''} ({e.home_score}-{e.away_score})" for e in events]
+
+        await self._send_message(chat_id, "⏳ <i>AI স্পোর্টস এডিটর পূর্ণাঙ্গ ম্যাচ রিপোর্ট তৈরি করছে...</i>")
+
+        report_text = await global_gemini_enricher.generate_match_report(
+            home_team=match.home_team.name,
+            away_team=match.away_team.name,
+            tournament=match.tournament_name,
+            score=f"{match.score.home}-{match.score.away}",
+            events_summary=events_summary,
+            stats_summary=stats or {},
+            lang="bn"
+        )
+        if not report_text:
+            report_text = f"<b>{match.home_team.name} {match.score.home}-{match.score.away} {match.away_team.name}</b>\n\nটুর্নামেন্ট: {match.tournament_name}\nম্যাচ স্ট্যাটাস: {match.status_detail}"
+
+        await self._send_message(
+            chat_id,
+            f"📰 <b>AI EDITORIAL MATCH REPORT</b> 🇧🇩\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n{report_text}\n\n#MatchReport #PavilionSports"
+        )
 
     async def _answer_callback(self, callback_query_id: str):
         try:
