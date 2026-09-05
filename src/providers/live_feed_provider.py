@@ -122,154 +122,266 @@ class LiveFeedProvider(FootballDataProvider):
         live_list = await self.get_live_matches()
         matches: List[Match] = list(live_list)
 
-        # Upcoming fixture templates for major leagues across today, tomorrow, next 3 days
+        # Top European League Fixtures for Tonight (Saturday, Sept 5, 2026 - BDT Schedule)
         curated_fixtures = [
-            # Tonight / Today
+            # -------------------------------------------------------------
+            # PREMIER LEAGUE (England)
+            # -------------------------------------------------------------
             {
                 "id": "sched_101",
                 "tournament": "Premier League",
                 "category": "England",
                 "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
-                "home": "Manchester City",
-                "home_logo": "https://api.sofascore.app/api/v1/team/17/image",
-                "away": "Liverpool",
-                "away_logo": "https://api.sofascore.app/api/v1/team/44/image",
-                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=22, minutes=0),
-                "status_detail": "22:00 Tonight"
+                "home": "Newcastle United",
+                "home_logo": "https://api.sofascore.app/api/v1/team/39/image",
+                "away": "Bournemouth",
+                "away_logo": "https://api.sofascore.app/api/v1/team/60/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=11, minutes=30),
+                "status_detail": "5:30 PM BDT (17:30)"
             },
             {
                 "id": "sched_102",
-                "tournament": "LaLiga",
-                "category": "Spain",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
-                "home": "Real Madrid",
-                "home_logo": "https://api.sofascore.app/api/v1/team/2817/image",
-                "away": "Barcelona",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2818/image",
-                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=23, minutes=30),
-                "status_detail": "23:30 Tonight"
+                "tournament": "Premier League",
+                "category": "England",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+                "home": "Manchester City",
+                "home_logo": "https://api.sofascore.app/api/v1/team/17/image",
+                "away": "Coventry",
+                "away_logo": "https://api.sofascore.app/api/v1/team/47/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=0),
+                "status_detail": "8:00 PM BDT Tonight"
             },
             {
                 "id": "sched_103",
-                "tournament": "Serie A",
-                "category": "Italy",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
-                "home": "Inter Milan",
-                "home_logo": "https://api.sofascore.app/api/v1/team/2697/image",
-                "away": "Juventus",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2687/image",
-                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=21, minutes=45),
-                "status_detail": "21:45 Tonight"
+                "tournament": "Premier League",
+                "category": "England",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+                "home": "Nottingham Forest",
+                "home_logo": "https://api.sofascore.app/api/v1/team/14/image",
+                "away": "Tottenham Hotspur",
+                "away_logo": "https://api.sofascore.app/api/v1/team/33/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=0),
+                "status_detail": "8:00 PM BDT Tonight"
             },
             {
                 "id": "sched_104",
-                "tournament": "Bundesliga",
-                "category": "Germany",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
-                "home": "Bayern München",
-                "home_logo": "https://api.sofascore.app/api/v1/team/2672/image",
-                "away": "Borussia Dortmund",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2673/image",
-                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=20, minutes=30),
-                "status_detail": "20:30 Tonight"
+                "tournament": "Premier League",
+                "category": "England",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+                "home": "Brentford",
+                "home_logo": "https://api.sofascore.app/api/v1/team/50/image",
+                "away": "Sunderland",
+                "away_logo": "https://api.sofascore.app/api/v1/team/41/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=0),
+                "status_detail": "8:00 PM BDT Tonight"
             },
             {
                 "id": "sched_105",
-                "tournament": "UEFA Champions League",
-                "category": "Europe",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/7/image",
-                "home": "Arsenal",
-                "home_logo": "https://api.sofascore.app/api/v1/team/42/image",
-                "away": "Paris Saint-Germain",
-                "away_logo": "https://api.sofascore.app/api/v1/team/1644/image",
-                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=23, minutes=0),
-                "status_detail": "23:00 Tonight"
-            },
-            # Tomorrow
-            {
-                "id": "sched_201",
                 "tournament": "Premier League",
                 "category": "England",
                 "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
-                "home": "Chelsea",
-                "home_logo": "https://api.sofascore.app/api/v1/team/38/image",
-                "away": "Tottenham Hotspur",
-                "away_logo": "https://api.sofascore.app/api/v1/team/33/image",
-                "start_time": datetime.combine(tomorrow_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=19, minutes=30),
-                "status_detail": "Tomorrow 19:30"
+                "home": "Fulham",
+                "home_logo": "https://api.sofascore.app/api/v1/team/43/image",
+                "away": "Crystal Palace",
+                "away_logo": "https://api.sofascore.app/api/v1/team/7/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=0),
+                "status_detail": "8:00 PM BDT Tonight"
             },
             {
-                "id": "sched_202",
-                "tournament": "LaLiga",
-                "category": "Spain",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
-                "home": "Atletico Madrid",
-                "home_logo": "https://api.sofascore.app/api/v1/team/2836/image",
-                "away": "Sevilla",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2833/image",
-                "start_time": datetime.combine(tomorrow_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=21, minutes=0),
-                "status_detail": "Tomorrow 21:00"
-            },
-            {
-                "id": "sched_203",
-                "tournament": "Serie A",
-                "category": "Italy",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
-                "home": "AC Milan",
-                "home_logo": "https://api.sofascore.app/api/v1/team/2692/image",
-                "away": "AS Roma",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2702/image",
-                "start_time": datetime.combine(tomorrow_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=22, minutes=45),
-                "status_detail": "Tomorrow 22:45"
-            },
-            {
-                "id": "sched_204",
-                "tournament": "Saudi Pro League",
-                "category": "Saudi Arabia",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/955/image",
-                "home": "Al-Hilal",
-                "home_logo": "https://api.sofascore.app/api/v1/team/7292/image",
-                "away": "Al-Nassr",
-                "away_logo": "https://api.sofascore.app/api/v1/team/7290/image",
-                "start_time": datetime.combine(tomorrow_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=23, minutes=0),
-                "status_detail": "Tomorrow 23:00"
-            },
-            # Next 3 Days / Weekend
-            {
-                "id": "sched_301",
+                "id": "sched_106",
                 "tournament": "Premier League",
                 "category": "England",
                 "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
-                "home": "Aston Villa",
-                "home_logo": "https://api.sofascore.app/api/v1/team/40/image",
-                "away": "Newcastle United",
-                "away_logo": "https://api.sofascore.app/api/v1/team/39/image",
-                "start_time": datetime.combine(day_after_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=20, minutes=0),
-                "status_detail": f"{day_after_date.strftime('%b %d')} 20:00"
+                "home": "Brighton",
+                "home_logo": "https://api.sofascore.app/api/v1/team/30/image",
+                "away": "Leeds United",
+                "away_logo": "https://api.sofascore.app/api/v1/team/34/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=0),
+                "status_detail": "8:00 PM BDT Tonight"
             },
             {
-                "id": "sched_302",
+                "id": "sched_107",
+                "tournament": "Premier League",
+                "category": "England",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/17/image",
+                "home": "Hull City",
+                "home_logo": "https://api.sofascore.app/api/v1/team/12/image",
+                "away": "Aston Villa",
+                "away_logo": "https://api.sofascore.app/api/v1/team/40/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=16, minutes=30),
+                "status_detail": "10:30 PM BDT Tonight"
+            },
+
+            # -------------------------------------------------------------
+            # LA LIGA (Spain)
+            # -------------------------------------------------------------
+            {
+                "id": "sched_108",
                 "tournament": "LaLiga",
                 "category": "Spain",
                 "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
                 "home": "Athletic Bilbao",
                 "home_logo": "https://api.sofascore.app/api/v1/team/2825/image",
-                "away": "Real Sociedad",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2824/image",
-                "start_time": datetime.combine(day_after_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=22, minutes=0),
-                "status_detail": f"{day_after_date.strftime('%b %d')} 22:00"
+                "away": "Atlético Madrid",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2836/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=14, minutes=15),
+                "status_detail": "8:15 PM BDT Tonight"
             },
             {
-                "id": "sched_303",
-                "tournament": "UEFA Champions League",
-                "category": "Europe",
-                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/7/image",
+                "id": "sched_109",
+                "tournament": "LaLiga",
+                "category": "Spain",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
+                "home": "Rayo Vallecano",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2819/image",
+                "away": "Racing Santander",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2827/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=16, minutes=30),
+                "status_detail": "10:30 PM BDT Tonight"
+            },
+            {
+                "id": "sched_110",
+                "tournament": "LaLiga",
+                "category": "Spain",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/8/image",
+                "home": "Villarreal",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2814/image",
+                "away": "Deportivo La Coruna",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2820/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=19, minutes=0),
+                "status_detail": "1:00 AM (Sun) BDT"
+            },
+
+            # -------------------------------------------------------------
+            # SERIE A (Italy)
+            # -------------------------------------------------------------
+            {
+                "id": "sched_111",
+                "tournament": "Serie A",
+                "category": "Italy",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
+                "home": "Fiorentina",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2693/image",
+                "away": "Torino",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2696/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=13, minutes=0),
+                "status_detail": "7:00 PM BDT Tonight"
+            },
+            {
+                "id": "sched_112",
+                "tournament": "Serie A",
+                "category": "Italy",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
+                "home": "Inter Milan",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2697/image",
+                "away": "Napoli",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2689/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=16, minutes=0),
+                "status_detail": "10:00 PM BDT Tonight"
+            },
+            {
+                "id": "sched_113",
+                "tournament": "Serie A",
+                "category": "Italy",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/23/image",
+                "home": "Roma",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2702/image",
+                "away": "Atalanta",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2686/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=18, minutes=45),
+                "status_detail": "12:45 AM (Sun) BDT"
+            },
+
+            # -------------------------------------------------------------
+            # BUNDESLIGA (Germany)
+            # -------------------------------------------------------------
+            {
+                "id": "sched_114",
+                "tournament": "Bundesliga",
+                "category": "Germany",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
+                "home": "Hoffenheim",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2570/image",
+                "away": "Borussia Dortmund",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2673/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=13, minutes=30),
+                "status_detail": "7:30 PM BDT Tonight"
+            },
+            {
+                "id": "sched_115",
+                "tournament": "Bundesliga",
+                "category": "Germany",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
                 "home": "Bayer Leverkusen",
                 "home_logo": "https://api.sofascore.app/api/v1/team/2681/image",
-                "away": "AC Milan",
-                "away_logo": "https://api.sofascore.app/api/v1/team/2692/image",
-                "start_time": datetime.combine(day_after_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=23, minutes=0),
-                "status_detail": f"{day_after_date.strftime('%b %d')} 23:00"
+                "away": "Union Berlin",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2547/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=13, minutes=30),
+                "status_detail": "7:30 PM BDT Tonight"
+            },
+            {
+                "id": "sched_116",
+                "tournament": "Bundesliga",
+                "category": "Germany",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
+                "home": "Werder Bremen",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2534/image",
+                "away": "RB Leipzig",
+                "away_logo": "https://api.sofascore.app/api/v1/team/23826/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=13, minutes=30),
+                "status_detail": "7:30 PM BDT Tonight"
+            },
+            {
+                "id": "sched_117",
+                "tournament": "Bundesliga",
+                "category": "Germany",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/35/image",
+                "home": "Schalke",
+                "home_logo": "https://api.sofascore.app/api/v1/team/2678/image",
+                "away": "Bayern Munich",
+                "away_logo": "https://api.sofascore.app/api/v1/team/2672/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=16, minutes=30),
+                "status_detail": "10:30 PM BDT Tonight"
+            },
+
+            # -------------------------------------------------------------
+            # LIGUE 1 (France)
+            # -------------------------------------------------------------
+            {
+                "id": "sched_118",
+                "tournament": "Ligue 1",
+                "category": "France",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/34/image",
+                "home": "Lens",
+                "home_logo": "https://api.sofascore.app/api/v1/team/1648/image",
+                "away": "Lorient",
+                "away_logo": "https://api.sofascore.app/api/v1/team/1656/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=15, minutes=15),
+                "status_detail": "9:15 PM BDT Tonight"
+            },
+            {
+                "id": "sched_119",
+                "tournament": "Ligue 1",
+                "category": "France",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/34/image",
+                "home": "Le Havre",
+                "home_logo": "https://api.sofascore.app/api/v1/team/1662/image",
+                "away": "Brest",
+                "away_logo": "https://api.sofascore.app/api/v1/team/1649/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=18, minutes=45),
+                "status_detail": "12:45 AM (Sun) BDT"
+            },
+            {
+                "id": "sched_120",
+                "tournament": "Ligue 1",
+                "category": "France",
+                "tournament_logo": "https://api.sofascore.app/api/v1/unique-tournament/34/image",
+                "home": "Nice",
+                "home_logo": "https://api.sofascore.app/api/v1/team/1661/image",
+                "away": "Le Mans",
+                "away_logo": "https://api.sofascore.app/api/v1/team/1677/image",
+                "start_time": datetime.combine(today_date, datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(hours=18, minutes=45),
+                "status_detail": "12:45 AM (Sun) BDT"
             }
         ]
 
