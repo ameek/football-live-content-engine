@@ -1219,6 +1219,26 @@ DASHBOARD_HTML = """
             renderCalendarLeagueDropdownItems(filtered, calendarMatches.length);
         }
 
+        function selectCalendarDate(tab) {
+            currentCalendarDate = tab;
+            const tabs = document.querySelectorAll('#calendar-date-tabs .cal-tab');
+            tabs.forEach(t => {
+                const text = t.innerText.toLowerCase();
+                let isMatch = false;
+                if (tab === 'today' && (text.includes('tonight') || text.includes('today'))) isMatch = true;
+                else if (tab === 'tomorrow' && text.includes('tomorrow')) isMatch = true;
+                else if (tab === 'weekend' && (text.includes('next') || text.includes('3 days') || text.includes('weekend'))) isMatch = true;
+                else if (tab === 'all' && text === 'all') isMatch = true;
+
+                if (isMatch) {
+                    t.className = "cal-tab active px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition flex-1 text-center shadow-sm";
+                } else {
+                    t.className = "cal-tab px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex-1 text-center";
+                }
+            });
+            filterCalendarMatches();
+        }
+
         function selectCalendarLeague(val, logoUrl) {
             calendarLeague = val;
             const btnText = document.getElementById('calendar-league-btn-text');
@@ -1241,14 +1261,50 @@ DASHBOARD_HTML = """
         }
 
         function quickFilterCalendarLeague(val) {
-            const entry = cachedCalendarLeaguesList.find(l => l.name.toLowerCase().includes(val.toLowerCase()));
+            const entry = cachedCalendarLeaguesList.find(l => 
+                l.name.toLowerCase().includes(val.toLowerCase()) || val.toLowerCase().includes(l.name.toLowerCase())
+            );
+            
+            // If selecting a specific league, check if it has matches in the current date tab. If not, auto-switch to 'all' so results show up immediately
+            if (val !== 'All' && currentCalendarDate !== 'all') {
+                const searchName = entry ? entry.name.toLowerCase() : val.toLowerCase();
+                const matchesInLeagueAndDate = calendarMatches.filter(m => {
+                    const lMatch = m.tournament_name.toLowerCase().includes(searchName) || searchName.includes(m.tournament_name.toLowerCase());
+                    if (!lMatch) return false;
+                    const detail = (m.status_detail || '').toLowerCase();
+                    if (currentCalendarDate === 'today') return detail.includes('tonight') || detail.includes('today') || detail.includes('live');
+                    if (currentCalendarDate === 'tomorrow') return detail.includes('tomorrow');
+                    return true;
+                });
+                if (matchesInLeagueAndDate.length === 0) {
+                    selectCalendarDate('all');
+                }
+            }
+
             selectCalendarLeague(val, entry ? entry.logo : null);
         }
 
         function updateCalendarPillHighlight() {
             const pills = document.querySelectorAll('#calendar-featured-pills .cal-pill-btn');
             pills.forEach(p => {
-                if (p.innerText.toLowerCase().includes(calendarLeague.toLowerCase()) || (calendarLeague === "All" && p.innerText.includes("All"))) {
+                const pText = p.innerText.toLowerCase();
+                const league = (calendarLeague || '').toLowerCase();
+                let isMatch = false;
+
+                if (calendarLeague === "All" && pText.includes("all")) {
+                    isMatch = true;
+                } else if (calendarLeague !== "All") {
+                    if (league.includes("champions") && pText.includes("champions")) isMatch = true;
+                    else if (league.includes("premier") && pText.includes("premier")) isMatch = true;
+                    else if (league.includes("laliga") && pText.includes("laliga")) isMatch = true;
+                    else if (league.includes("serie a") && pText.includes("serie a")) isMatch = true;
+                    else if (league.includes("bundesliga") && pText.includes("bundesliga")) isMatch = true;
+                    else if (league.includes("saudi") && pText.includes("saudi")) isMatch = true;
+                    else if (league.includes("portugal") && pText.includes("portugal")) isMatch = true;
+                    else if (pText.includes(league) || league.includes(pText.replace(/[^a-z0-9 ]/g, '').trim())) isMatch = true;
+                }
+
+                if (isMatch) {
                     p.className = "cal-pill-btn active px-3 py-1 rounded-lg bg-indigo-600 text-white font-semibold whitespace-nowrap shadow-sm text-xs";
                 } else {
                     p.className = "cal-pill-btn px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-medium whitespace-nowrap border border-slate-800 text-xs";
@@ -1259,6 +1315,7 @@ DASHBOARD_HTML = """
         function clearCalendarSearch() {
             document.getElementById('calendar-search-input').value = '';
             document.getElementById('calendar-status-filter').value = 'ALL';
+            selectCalendarDate('today');
             quickFilterCalendarLeague('All');
         }
 
@@ -1286,8 +1343,14 @@ DASHBOARD_HTML = """
                 }
 
                 // 2. League filter
-                if (calendarLeague !== "All" && !m.tournament_name.toLowerCase().includes(calendarLeague.toLowerCase())) {
-                    return false;
+                if (calendarLeague !== "All") {
+                    const lName = (m.tournament_name || '').toLowerCase();
+                    const filterName = calendarLeague.toLowerCase();
+                    const isMatch = lName.includes(filterName) || filterName.includes(lName) ||
+                        (filterName.includes("champions") && lName.includes("champions")) ||
+                        (filterName.includes("saudi") && lName.includes("saudi")) ||
+                        (filterName.includes("portugal") && lName.includes("portugal"));
+                    if (!isMatch) return false;
                 }
 
                 // 3. Status filter
@@ -1300,14 +1363,14 @@ DASHBOARD_HTML = """
                     const startTime = m.start_time ? m.start_time.split('T')[0] : null;
 
                     if (currentCalendarDate === 'today') {
-                        const isToday = detail.includes('tonight') || detail.includes('live') || detail.includes('1h') || detail.includes('2h') || detail.includes('ht') || detail.includes("'") || startTime === todayStr;
+                        const isToday = detail.includes('tonight') || detail.includes('today') || detail.includes('live') || detail.includes('1h') || detail.includes('2h') || detail.includes('ht') || detail.includes("'") || startTime === todayStr;
                         if (!isToday && (detail.includes('tomorrow') || (startTime && startTime > todayStr))) return false;
                     } else if (currentCalendarDate === 'tomorrow') {
                         const isTomorrow = detail.includes('tomorrow') || startTime === tomorrowStr;
                         if (!isTomorrow) return false;
                     } else if (currentCalendarDate === 'weekend') {
                         // Next 3 days includes tomorrow and day after
-                        const isNext3Days = detail.includes('tomorrow') || detail.includes('tonight') || (startTime && startTime >= todayStr);
+                        const isNext3Days = detail.includes('tomorrow') || detail.includes('tonight') || detail.includes('today') || (startTime && startTime >= todayStr);
                         if (!isNext3Days) return false;
                     }
                 }
