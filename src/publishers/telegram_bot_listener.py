@@ -112,12 +112,13 @@ class TelegramBotListener:
                 "Welcome to the automated sports newsroom controller bot!\n\n"
                 "<b>Public Commands:</b>\n"
                 "• <code>/status</code> — Check active monitored matches & night shift state\n"
-                "• <code>/live</code> — List top worldwide live matches\n"
+                "• <code>/live [league]</code> — List live matches (e.g. <code>/live</code>, <code>/live premier</code>)\n"
+                "• <code>/fixtures [league]</code> — List upcoming fixtures by league (e.g. <code>/fixtures laliga</code>)\n"
                 "• <code>/stats &lt;match_id&gt;</code> — Pull live match statistics snapshot\n"
                 "• <code>/lineups &lt;match_id&gt;</code> — Render Starting XI pitch tactical board\n"
                 "• <code>/report &lt;match_id&gt;</code> — Generate 300-word AI editorial match report\n\n"
                 "<b>🔐 Administrative Controls (PIN Protected):</b>\n"
-                "• <code>/code &lt;PIN&gt;</code> — Authenticate session (e.g. <code>/code 2026</code>)\n"
+                "• <code>/code &lt;PIN&gt;</code> — Authenticate session with secret PIN\n"
                 "• <code>/track &lt;match_id&gt;</code> — Arm a match on the remote desk\n"
                 "• <code>/untrack &lt;match_id&gt;</code> — Stop tracking a match\n"
                 "• <code>/nightshift on|off</code> — Toggle autonomous night shift mode\n"
@@ -126,15 +127,15 @@ class TelegramBotListener:
             )
             keyboard = {
                 "inline_keyboard": [
-                    [{"text": "📊 ডেস্কে স্ট্যাটাস", "callback_data": "cmd_status"}, {"text": "⚽ লাইভ ম্যাচ তালিকা", "callback_data": "cmd_live"}],
-                    [{"text": "🌙 নাইট শিফট টগল", "callback_data": "cmd_nightshift"}]
+                    [{"text": "📊 ডেস্কে স্ট্যাটাস", "callback_data": "cmd_status"}, {"text": "⚽ লাইভ ম্যাচ", "callback_data": "cmd_live"}],
+                    [{"text": "📅 সূচি (Fixtures)", "callback_data": "cmd_fixtures"}, {"text": "🌙 নাইট শিফট টগল", "callback_data": "cmd_nightshift"}]
                 ]
             }
             await self._send_message(chat_id, help_text, keyboard)
 
         elif cmd in ("/code", "/auth", "/login", "/pin"):
             if len(parts) < 2:
-                await self._send_message(chat_id, "❌ <b>Usage:</b> <code>/code &lt;PIN&gt;</code> (e.g. <code>/code 2026</code>)")
+                await self._send_message(chat_id, "❌ <b>Usage:</b> <code>/code &lt;PIN&gt;</code>")
                 return
             entered_pin = parts[1].strip()
             if entered_pin == self.get_expected_pin().strip():
@@ -155,7 +156,12 @@ class TelegramBotListener:
             await self._reply_status(chat_id)
 
         elif cmd == "/live":
-            await self._reply_live_matches(chat_id)
+            league_filter = " ".join(parts[1:]).strip() if len(parts) > 1 else None
+            await self._reply_live_matches(chat_id, league_filter)
+
+        elif cmd in ("/fixtures", "/schedule", "/matches"):
+            league_filter = " ".join(parts[1:]).strip() if len(parts) > 1 else None
+            await self._reply_fixtures(chat_id, league_filter)
 
         elif cmd == "/track":
             # Check security authorization
@@ -277,6 +283,14 @@ class TelegramBotListener:
             await self._reply_status(chat_id)
         elif data == "cmd_live":
             await self._reply_live_matches(chat_id)
+        elif data == "cmd_fixtures":
+            await self._reply_fixtures(chat_id)
+        elif data.startswith("fixtures:"):
+            l_query = data.split("fixtures:")[-1]
+            await self._reply_fixtures(chat_id, l_query if l_query != "all" else None)
+        elif data.startswith("live:"):
+            l_query = data.split("live:")[-1]
+            await self._reply_live_matches(chat_id, l_query if l_query != "all" else None)
         elif data == "cmd_nightshift":
             if not self.is_authorized(chat_id, user_id):
                 await self._send_message(chat_id, "🔒 <b>Action Denied:</b> Night Shift toggle requires authentication. Send <code>/code &lt;PIN&gt;</code> first.")
@@ -358,21 +372,83 @@ class TelegramBotListener:
         }
         await self._send_message(chat_id, status_text, keyboard)
 
-    async def _reply_live_matches(self, chat_id: int):
-        matches = await self.monitor.provider.get_live_matches()
-        if not matches:
+    async def _reply_live_matches(self, chat_id: int, league_filter: Optional[str] = None):
+        all_live = await self.monitor.provider.get_live_matches()
+        if not all_live:
             await self._send_message(chat_id, "⚽ বর্তমানে কোন লাইভ ম্যাচ পাওয়া যায়নি।")
             return
 
+        matches = all_live
+        filter_label = "সব লাইভ ম্যাচ (All Competitions)"
+        if league_filter:
+            q = league_filter.lower().strip()
+            matches = [m for m in all_live if q in m.tournament_name.lower() or q in m.tournament_category.lower() or q in m.home_team.name.lower() or q in m.away_team.name.lower()]
+            filter_label = f"ফিল্টার: <b>{league_filter.title()}</b>"
+
+        if not matches:
+            await self._send_message(chat_id, f"⚽ <b>{filter_label}</b> ক্যাটাগরিতে বর্তমানে কোনো লাইভ ম্যাচ চলছে না।\n\n💡 সব লাইভ ম্যাচ দেখতে <code>/live</code> বা সূচি দেখতে <code>/fixtures</code> ব্যবহার করুন।")
+            return
+
         buttons = []
-        text_lines = ["⚽ <b>চলতি শীর্ষ লাইভ ম্যাচসমূহ (Top Live Matches):</b>\n"]
-        for m in matches[:6]:
+        text_lines = [f"⚽ <b>চলতি লাইভ ম্যাচসমূহ ({filter_label})</b> [মোট {len(matches)}টি]:\n"]
+        for m in matches[:8]:
             tracked_marker = " [✅ Tracked]" if m.id in self.monitor.monitored_matches else ""
             text_lines.append(f"• <b>{m.home_team.name} {m.score.home}-{m.score.away} {m.away_team.name}</b>{tracked_marker}\n  🏆 {m.tournament_name} (ID: <code>{m.id}</code>)")
             if m.id not in self.monitor.monitored_matches:
                 buttons.append([{"text": f"+ Track {m.home_team.name[:12]} vs {m.away_team.name[:12]}", "callback_data": f"track:{m.id}"}])
 
-        buttons.append([{"text": "📊 ডেস্কে স্ট্যাটাস", "callback_data": "cmd_status"}])
+        # League Quick Filter Buttons
+        buttons.append([
+            {"text": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL", "callback_data": "live:premier"},
+            {"text": "🇪🇸 LaLiga", "callback_data": "live:laliga"},
+            {"text": "🇮🇹 Serie A", "callback_data": "live:serie a"}
+        ])
+        buttons.append([
+            {"text": "🇩🇪 Bundesliga", "callback_data": "live:bundesliga"},
+            {"text": "🇫🇷 Ligue 1", "callback_data": "live:ligue 1"},
+            {"text": "🌍 All Live", "callback_data": "live:all"}
+        ])
+        buttons.append([{"text": "📅 সূচি (Fixtures)", "callback_data": "cmd_fixtures"}, {"text": "📊 ডেস্কে স্ট্যাটাস", "callback_data": "cmd_status"}])
+        keyboard = {"inline_keyboard": buttons}
+        await self._send_message(chat_id, "\n".join(text_lines), keyboard)
+
+    async def _reply_fixtures(self, chat_id: int, league_filter: Optional[str] = None):
+        scheduled = await self.monitor.provider.get_scheduled_matches()
+        if not scheduled:
+            await self._send_message(chat_id, "📅 বর্তমানে কোনো সূচি পাওয়া যায়নি।")
+            return
+
+        matches = [m for m in scheduled if m.id.startswith("sched_")]
+        filter_label = "সব লীগ (All Competitions)"
+        if league_filter:
+            q = league_filter.lower().strip()
+            matches = [m for m in matches if q in m.tournament_name.lower() or q in m.tournament_category.lower() or q in m.home_team.name.lower() or q in m.away_team.name.lower()]
+            filter_label = f"ফিল্টার: <b>{league_filter.title()}</b>"
+
+        if not matches:
+            await self._send_message(chat_id, f"📅 <b>{filter_label}</b> ক্যাটাগরিতে কোনো সূচি পাওয়া যায়নি।")
+            return
+
+        buttons = []
+        text_lines = [f"📅 <b>আজকের ম্যাচ সূচি ({filter_label})</b> [মোট {len(matches)}টি]:\n"]
+        for m in matches[:8]:
+            tracked_marker = " [✅ Tracked]" if m.id in self.monitor.monitored_matches else ""
+            text_lines.append(f"• <b>{m.home_team.name} vs {m.away_team.name}</b>{tracked_marker}\n  🏆 {m.tournament_name} — ⏰ <code>{m.status_detail}</code> (ID: <code>{m.id}</code>)")
+            if m.id not in self.monitor.monitored_matches:
+                buttons.append([{"text": f"+ Track {m.home_team.name[:12]} vs {m.away_team.name[:12]}", "callback_data": f"track:{m.id}"}])
+
+        # League Quick Filter Buttons
+        buttons.append([
+            {"text": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL", "callback_data": "fixtures:premier"},
+            {"text": "🇪🇸 LaLiga", "callback_data": "fixtures:laliga"},
+            {"text": "🇮🇹 Serie A", "callback_data": "fixtures:serie a"}
+        ])
+        buttons.append([
+            {"text": "🇩🇪 Bundesliga", "callback_data": "fixtures:bundesliga"},
+            {"text": "🇫🇷 Ligue 1", "callback_data": "fixtures:ligue 1"},
+            {"text": "🌍 All", "callback_data": "fixtures:all"}
+        ])
+        buttons.append([{"text": "⚽ লাইভ ম্যাচ", "callback_data": "cmd_live"}, {"text": "📊 ডেস্কে স্ট্যাটাস", "callback_data": "cmd_status"}])
         keyboard = {"inline_keyboard": buttons}
         await self._send_message(chat_id, "\n".join(text_lines), keyboard)
 
